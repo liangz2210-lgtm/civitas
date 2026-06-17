@@ -1,0 +1,27 @@
+[workspace]
+resolver = "2"
+members  = [
+    "pallets/civ-identity",
+    "pallets/civ-monetary",
+    "pallets/civ-governance",
+]
+
+[workspace.package]
+authors    = ["Civitas Protocol Contributors"]
+edition    = "2021"
+license    = "Apache-2.0"
+repository = "https://github.com/civitas-protocol/civitas"
+version    = "0.1.0"
+
+[workspace.dependencies]
+frame-support      = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2409", default-features = false }
+frame-system       = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2409", default-features = false }
+sp-runtime         = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2409", default-features = false }
+sp-std             = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2409", default-features = false }
+sp-io              = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2409", default-features = false }
+sp-core            = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2409", default-features = false }
+pallet-balances    = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2409", default-features = false }
+scale-info         = { version = "2.11", default-features = false, features = ["derive"] }
+parity-scale-codec = { version = "3.6",  default-features = false, features = ["derive"] }
+
+pallet-civ-identity = { path = "pallets/civ-identity", default-features = false }
