@@ -47,8 +47,11 @@ pub mod pallet {
         traits::{Currency, ExistenceRequirement, WithdrawReasons},
     };
     use frame_system::pallet_prelude::*;
-    use sp_runtime::{Perbill, traits::Zero};
     use pallet_civ_identity::PersonhoodProvider;
+    use sp_runtime::{
+        traits::{CheckedAdd, Saturating, Zero},
+        Perbill,
+    };
 
     pub type BalanceOf<T> =
         <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -62,7 +65,7 @@ pub mod pallet {
     /// ~7 days — auto-stabiliser run.
     const STABILISE_INTERVAL: u32 = 100_800;
     /// Price stored as integer × 10^8.  $1.00 = 100_000_000.
-    const PRICE_PRECISION: u64 = 100_000_000;
+    pub const PRICE_PRECISION: u64 = 100_000_000;
     /// Max single oracle update: ±20% of current EMA.
     const MAX_PRICE_CHANGE_PCT: u64 = 20;
     /// β and γ hard ceiling regardless of stabiliser.
@@ -71,14 +74,17 @@ pub mod pallet {
     // ── Types ─────────────────────────────────────────────────────────────
 
     #[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-    pub enum Phase { Bootstrap, Transition, Equilibrium }
+    pub enum Phase {
+        Bootstrap,
+        Transition,
+        Equilibrium,
+    }
 
     // ── Config ────────────────────────────────────────────────────────────
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        type RuntimeEvent: From<Event<Self>>
-            + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
         type Currency: Currency<Self::AccountId>;
         type Personhood: PersonhoodProvider<Self::AccountId>;
         /// Admin / oracle origin (V0.1: EnsureRoot; V0.2: multi-source feed).
@@ -105,38 +111,48 @@ pub mod pallet {
 
     // ── Storage ───────────────────────────────────────────────────────────
 
-    #[pallet::storage] #[pallet::getter(fn total_minted)]
+    #[pallet::storage]
+    #[pallet::getter(fn total_minted)]
     pub type TotalMinted<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
 
-    #[pallet::storage] #[pallet::getter(fn fee_pool)]
+    #[pallet::storage]
+    #[pallet::getter(fn fee_pool)]
     pub type FeePool<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
 
-    #[pallet::storage] #[pallet::getter(fn target_supply)]
+    #[pallet::storage]
+    #[pallet::getter(fn target_supply)]
     pub type TargetSupply<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
 
     /// EMA of market price in PRICE_PRECISION units. Default $1.00.
-    #[pallet::storage] #[pallet::getter(fn ema_price)]
+    #[pallet::storage]
+    #[pallet::getter(fn ema_price)]
     pub type EmaPrice<T: Config> = StorageValue<_, u64, ValueQuery>;
 
-    #[pallet::storage] #[pallet::getter(fn last_claim)]
+    #[pallet::storage]
+    #[pallet::getter(fn last_claim)]
     pub type LastClaim<T: Config> =
         StorageMap<_, Blake2_128Concat, T::AccountId, BlockNumberFor<T>, OptionQuery>;
 
-    #[pallet::storage] #[pallet::getter(fn last_activity)]
+    #[pallet::storage]
+    #[pallet::getter(fn last_activity)]
     pub type LastActivity<T: Config> =
         StorageMap<_, Blake2_128Concat, T::AccountId, BlockNumberFor<T>, OptionQuery>;
 
-    #[pallet::storage] #[pallet::getter(fn activity_score)]
+    #[pallet::storage]
+    #[pallet::getter(fn activity_score)]
     pub type ActivityScore<T: Config> =
         StorageMap<_, Blake2_128Concat, T::AccountId, u32, ValueQuery>;
 
-    #[pallet::storage] #[pallet::getter(fn tx_fee_rate)]
+    #[pallet::storage]
+    #[pallet::getter(fn tx_fee_rate)]
     pub type TxFeeRate<T: Config> = StorageValue<_, Perbill, ValueQuery>;
 
-    #[pallet::storage] #[pallet::getter(fn inactivity_rate)]
+    #[pallet::storage]
+    #[pallet::getter(fn inactivity_rate)]
     pub type InactivityRate<T: Config> = StorageValue<_, Perbill, ValueQuery>;
 
-    #[pallet::storage] #[pallet::getter(fn wealth_decay_rate)]
+    #[pallet::storage]
+    #[pallet::getter(fn wealth_decay_rate)]
     pub type WealthDecayRate<T: Config> = StorageValue<_, Perbill, ValueQuery>;
 
     // ── Genesis ───────────────────────────────────────────────────────────
@@ -144,11 +160,12 @@ pub mod pallet {
     #[pallet::genesis_config]
     #[derive(frame_support::DefaultNoBound)]
     pub struct GenesisConfig<T: Config> {
-        pub initial_price:     Option<u64>,
-        pub tx_fee_rate:       Option<Perbill>,
-        pub inactivity_rate:   Option<Perbill>,
+        pub initial_price: Option<u64>,
+        pub tx_fee_rate: Option<Perbill>,
+        pub inactivity_rate: Option<Perbill>,
         pub wealth_decay_rate: Option<Perbill>,
-        #[serde(skip)] pub _ph: core::marker::PhantomData<T>,
+        #[serde(skip)]
+        pub _ph: core::marker::PhantomData<T>,
     }
 
     #[pallet::genesis_build]
@@ -179,12 +196,33 @@ pub mod pallet {
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
-        UbiClaimed    { who: T::AccountId, amount: BalanceOf<T>, phase: Phase },
-        Transferred   { from: T::AccountId, to: T::AccountId, amount: BalanceOf<T>, fee: BalanceOf<T> },
-        DecayApplied  { who: T::AccountId, amount: BalanceOf<T> },
-        PriceUpdated  { raw: u64, ema: u64 },
-        RatesAdjusted { alpha: Perbill, beta: Perbill, gamma: Perbill },
-        TargetUpdated { new_target: BalanceOf<T> },
+        UbiClaimed {
+            who: T::AccountId,
+            amount: BalanceOf<T>,
+            phase: Phase,
+        },
+        Transferred {
+            from: T::AccountId,
+            to: T::AccountId,
+            amount: BalanceOf<T>,
+            fee: BalanceOf<T>,
+        },
+        DecayApplied {
+            who: T::AccountId,
+            amount: BalanceOf<T>,
+        },
+        PriceUpdated {
+            raw: u64,
+            ema: u64,
+        },
+        RatesAdjusted {
+            alpha: Perbill,
+            beta: Perbill,
+            gamma: Perbill,
+        },
+        TargetUpdated {
+            new_target: BalanceOf<T>,
+        },
     }
 
     // ── Errors ────────────────────────────────────────────────────────────
@@ -205,7 +243,6 @@ pub mod pallet {
 
     #[pallet::call]
     impl<T: Config> Pallet<T> {
-
         /// Claim daily UBI. Amount = FCI / EMA(price) × ActivityFactor.
         #[pallet::call_index(0)]
         #[pallet::weight(50_000)]
@@ -215,11 +252,14 @@ pub mod pallet {
 
             let now = frame_system::Pallet::<T>::block_number();
             if let Some(last) = LastClaim::<T>::get(&who) {
-                ensure!(now >= last + CLAIM_INTERVAL.into(), Error::<T>::CooldownActive);
+                ensure!(
+                    now >= last + CLAIM_INTERVAL.into(),
+                    Error::<T>::CooldownActive
+                );
             }
 
             let amount = Self::ubi_amount(&who);
-            let phase  = Self::current_phase();
+            let phase = Self::current_phase();
             Self::issue_ubi(&who, amount, &phase)?;
 
             LastClaim::<T>::insert(&who, now);
@@ -237,19 +277,28 @@ pub mod pallet {
             amount: BalanceOf<T>,
         ) -> DispatchResult {
             let from = ensure_signed(origin)?;
-            let fee   = TxFeeRate::<T>::get() * amount;
+            let fee = TxFeeRate::<T>::get() * amount;
             let total = amount.checked_add(&fee).ok_or(Error::<T>::Overflow)?;
 
-            T::Currency::withdraw(&from, total, WithdrawReasons::TRANSFER,
-                ExistenceRequirement::KeepAlive)
-                .map_err(|_| Error::<T>::InsufficientBalance)?;
+            T::Currency::withdraw(
+                &from,
+                total,
+                WithdrawReasons::TRANSFER,
+                ExistenceRequirement::KeepAlive,
+            )
+            .map_err(|_| Error::<T>::InsufficientBalance)?;
 
             T::Currency::deposit_creating(&to, amount);
             FeePool::<T>::mutate(|p| *p = p.saturating_add(fee));
             ActivityScore::<T>::mutate(&from, |s| *s = (*s + 1).min(100));
             LastActivity::<T>::insert(&from, frame_system::Pallet::<T>::block_number());
 
-            Self::deposit_event(Event::Transferred { from, to, amount, fee });
+            Self::deposit_event(Event::Transferred {
+                from,
+                to,
+                amount,
+                fee,
+            });
             Ok(())
         }
 
@@ -262,10 +311,10 @@ pub mod pallet {
             accounts: BoundedVec<T::AccountId, T::MaxDecayBatch>,
         ) -> DispatchResult {
             T::AdminOrigin::ensure_origin(origin)?;
-            let now    = frame_system::Pallet::<T>::block_number();
+            let now = frame_system::Pallet::<T>::block_number();
             let median = Self::median_estimate();
-            let beta   = InactivityRate::<T>::get();
-            let gamma  = WealthDecayRate::<T>::get();
+            let beta = InactivityRate::<T>::get();
+            let gamma = WealthDecayRate::<T>::get();
 
             for who in accounts.into_iter() {
                 let bal = T::Currency::free_balance(&who);
@@ -285,10 +334,17 @@ pub mod pallet {
 
                 if !decay.is_zero() {
                     let actual = decay.min(bal);
-                    let _ = T::Currency::withdraw(&who, actual, WithdrawReasons::FEE,
-                        ExistenceRequirement::AllowDeath);
+                    let _ = T::Currency::withdraw(
+                        &who,
+                        actual,
+                        WithdrawReasons::FEE,
+                        ExistenceRequirement::AllowDeath,
+                    );
                     FeePool::<T>::mutate(|p| *p = p.saturating_add(actual));
-                    Self::deposit_event(Event::DecayApplied { who: who.clone(), amount: actual });
+                    Self::deposit_event(Event::DecayApplied {
+                        who: who.clone(),
+                        amount: actual,
+                    });
                 }
                 ActivityScore::<T>::mutate(&who, |s| *s = s.saturating_sub(10));
             }
@@ -311,8 +367,7 @@ pub mod pallet {
             // Rate limit: raw must be within ±20% of current EMA
             let max_delta = old.saturating_mul(MAX_PRICE_CHANGE_PCT) / 100;
             ensure!(
-                raw >= old.saturating_sub(max_delta) &&
-                raw <= old.saturating_add(max_delta),
+                raw >= old.saturating_sub(max_delta) && raw <= old.saturating_add(max_delta),
                 Error::<T>::PriceChangeTooLarge
             );
 
@@ -334,9 +389,9 @@ pub mod pallet {
             T::AdminOrigin::ensure_origin(origin)?;
             let step = Perbill::from_parts(2_000); // 0.20%
             ensure!(
-                Self::pdelta(TxFeeRate::<T>::get(), alpha)        <= step &&
-                Self::pdelta(InactivityRate::<T>::get(), beta)     <= step &&
-                Self::pdelta(WealthDecayRate::<T>::get(), gamma)   <= step,
+                Self::pdelta(TxFeeRate::<T>::get(), alpha) <= step
+                    && Self::pdelta(InactivityRate::<T>::get(), beta) <= step
+                    && Self::pdelta(WealthDecayRate::<T>::get(), gamma) <= step,
                 Error::<T>::RateChangeTooLarge
             );
             TxFeeRate::<T>::put(alpha);
@@ -349,10 +404,7 @@ pub mod pallet {
         /// Governance: update target supply (GPI proxy until oracle is live).
         #[pallet::call_index(5)]
         #[pallet::weight(5_000)]
-        pub fn set_target_supply(
-            origin: OriginFor<T>,
-            new_target: BalanceOf<T>,
-        ) -> DispatchResult {
+        pub fn set_target_supply(origin: OriginFor<T>, new_target: BalanceOf<T>) -> DispatchResult {
             T::AdminOrigin::ensure_origin(origin)?;
             TargetSupply::<T>::put(new_target);
             Self::deposit_event(Event::TargetUpdated { new_target });
@@ -363,7 +415,6 @@ pub mod pallet {
     // ── Internals ─────────────────────────────────────────────────────────
 
     impl<T: Config> Pallet<T> {
-
         /// Current monetary phase.
         ///
         /// Equilibrium requires BOTH supply ≥ target AND FeePool ≥ reserve.
@@ -372,20 +423,20 @@ pub mod pallet {
         pub fn current_phase() -> Phase {
             let minted = TotalMinted::<T>::get();
             let target = TargetSupply::<T>::get();
-            let t80    = Perbill::from_percent(80) * target;
+            let t80 = Perbill::from_percent(80) * target;
 
-            if minted < t80 { return Phase::Bootstrap; }
-            if minted < target { return Phase::Transition; }
+            if minted < t80 {
+                return Phase::Bootstrap;
+            }
+            if minted < target {
+                return Phase::Transition;
+            }
 
             // Supply threshold met — check pool adequacy
-            let count   = T::Personhood::verified_count();
+            let count = T::Personhood::verified_count();
             let per_day = Self::per_person_base_ubi();
-            let demand  = per_day.saturating_mul(
-                BalanceOf::<T>::from(count as u32)
-            );
-            let required = demand.saturating_mul(
-                T::EquilibriumReserveDays::get().into()
-            );
+            let demand = per_day.saturating_mul(BalanceOf::<T>::from(count as u32));
+            let required = demand.saturating_mul(T::EquilibriumReserveDays::get().into());
 
             if FeePool::<T>::get() >= required {
                 Phase::Equilibrium
@@ -395,17 +446,17 @@ pub mod pallet {
         }
 
         fn ubi_amount(who: &T::AccountId) -> BalanceOf<T> {
-            let base  = Self::per_person_base_ubi();
+            let base = Self::per_person_base_ubi();
             let score = ActivityScore::<T>::get(who).min(100);
             // ActivityFactor = (50 + score) / 100
             Perbill::from_rational(50u32 + score, 100u32) * base
         }
 
         /// Base UBI = FCI / EMA(price), clamped to MaxDailyMintPerPerson.
-        fn per_person_base_ubi() -> BalanceOf<T> {
+        pub fn per_person_base_ubi() -> BalanceOf<T> {
             let price = EmaPrice::<T>::get().max(1);
-            let fci   = T::FoodCostIndex::get();
-            let raw   = (fci as u128)
+            let fci = T::FoodCostIndex::get();
+            let raw = (fci as u128)
                 .saturating_mul(1_000_000u128)
                 .checked_div(price as u128)
                 .unwrap_or(0);
@@ -414,7 +465,9 @@ pub mod pallet {
         }
 
         fn issue_ubi(who: &T::AccountId, amount: BalanceOf<T>, phase: &Phase) -> DispatchResult {
-            if amount.is_zero() { return Ok(()); }
+            if amount.is_zero() {
+                return Ok(());
+            }
             match phase {
                 Phase::Bootstrap => {
                     T::Currency::deposit_creating(who, amount);
@@ -426,7 +479,7 @@ pub mod pallet {
                     T::Currency::deposit_creating(who, amount);
                 }
                 Phase::Transition => {
-                    let gap       = TargetSupply::<T>::get().saturating_sub(TotalMinted::<T>::get());
+                    let gap = TargetSupply::<T>::get().saturating_sub(TotalMinted::<T>::get());
                     let from_mint = amount.min(gap);
                     let from_pool = amount.saturating_sub(from_mint);
                     if !from_mint.is_zero() {
@@ -447,24 +500,32 @@ pub mod pallet {
         /// Replaced by order-statistics in V0.2.
         fn median_estimate() -> BalanceOf<T> {
             let n = T::Personhood::verified_count();
-            if n == 0 { return BalanceOf::<T>::zero(); }
+            if n == 0 {
+                return BalanceOf::<T>::zero();
+            }
             TotalMinted::<T>::get() / BalanceOf::<T>::from(2u32 * n as u32)
         }
 
         fn pdelta(a: Perbill, b: Perbill) -> Perbill {
-            if a >= b { a - b } else { b - a }
+            if a >= b {
+                a - b
+            } else {
+                b - a
+            }
         }
 
         /// Weekly auto-stabiliser: nudge rates ±0.2% based on pool health.
         fn auto_stabilise() {
-            let count  = T::Personhood::verified_count();
-            if count == 0 { return; }
+            let count = T::Personhood::verified_count();
+            if count == 0 {
+                return;
+            }
 
-            let per_day   = Self::per_person_base_ubi();
-            let weekly    = per_day
+            let per_day = Self::per_person_base_ubi();
+            let weekly = per_day
                 .saturating_mul(7u32.into())
                 .saturating_mul((count as u32).into());
-            let low  = Perbill::from_percent(80)  * weekly;
+            let low = Perbill::from_percent(80) * weekly;
             let high = Perbill::from_percent(120) * weekly;
             let pool = FeePool::<T>::get();
             let step = Perbill::from_parts(2_000);
@@ -495,122 +556,181 @@ pub mod pallet {
 
 #[cfg(test)]
 mod tests {
-    use super::pallet::{Error, Phase, PRICE_PRECISION};
-    use super::*;
-    use frame_support::{assert_noop, assert_ok, traits::ConstU32};
-    use sp_core::H256;
-    use sp_runtime::{traits::{BlakeTwo256, IdentityLookup}, BuildStorage, Perbill};
+    use super::pallet;
+    use super::pallet::{Config, Error, Pallet, Phase, PRICE_PRECISION};
+    use crate as pallet_civ_monetary;
+    use frame_support::{assert_noop, assert_ok, traits::ConstU32, BoundedVec};
     use pallet_civ_identity::PersonhoodProvider;
+    use sp_core::H256;
+    use sp_runtime::{
+        traits::{BlakeTwo256, IdentityLookup},
+        BuildStorage, Perbill,
+    };
 
     type Block = frame_system::mocking::MockBlock<Test>;
     frame_support::construct_runtime!(
-        pub enum Test { System: frame_system, Balances: pallet_balances, CivMon: pallet }
+        pub enum Test { System: frame_system, Balances: pallet_balances, CivMon: pallet_civ_monetary }
     );
 
-    struct MockId;
+    pub struct MockId;
     impl PersonhoodProvider<u64> for MockId {
-        fn is_verified(who: &u64) -> bool { *who < 100 }
-        fn verified_count() -> u64 { 10 }
-        fn audit_certified() -> bool { true }
+        fn is_verified(who: &u64) -> bool {
+            *who < 100
+        }
+        fn verified_count() -> u64 {
+            10
+        }
+        fn audit_certified() -> bool {
+            true
+        }
     }
 
     impl frame_system::Config for Test {
         type BaseCallFilter = frame_support::traits::Everything;
-        type BlockWeights = (); type BlockLength = (); type DbWeight = ();
-        type RuntimeOrigin = RuntimeOrigin; type RuntimeCall = RuntimeCall;
-        type RuntimeTask = (); type Nonce = u64; type Hash = H256;
-        type Hashing = BlakeTwo256; type AccountId = u64;
-        type Lookup = IdentityLookup<u64>; type Block = Block;
-        type RuntimeEvent = RuntimeEvent; type BlockHashCount = ();
-        type Version = (); type PalletInfo = PalletInfo;
+        type BlockWeights = ();
+        type BlockLength = ();
+        type DbWeight = ();
+        type RuntimeOrigin = RuntimeOrigin;
+        type RuntimeCall = RuntimeCall;
+        type RuntimeTask = ();
+        type Nonce = u64;
+        type Hash = H256;
+        type Hashing = BlakeTwo256;
+        type AccountId = u64;
+        type Lookup = IdentityLookup<u64>;
+        type Block = Block;
+        type RuntimeEvent = RuntimeEvent;
+        type BlockHashCount = ();
+        type Version = ();
+        type PalletInfo = PalletInfo;
         type AccountData = pallet_balances::AccountData<u128>;
-        type OnNewAccount = (); type OnKilledAccount = ();
-        type SystemWeightInfo = (); type SS58Prefix = (); type OnSetCode = ();
+        type OnNewAccount = ();
+        type OnKilledAccount = ();
+        type SystemWeightInfo = ();
+        type SS58Prefix = ();
+        type OnSetCode = ();
         type MaxConsumers = ConstU32<16>;
+        type SingleBlockMigrations = ();
+        type MultiBlockMigrator = ();
+        type PreInherents = ();
+        type PostInherents = ();
+        type PostTransactions = ();
     }
     frame_support::parameter_types! { pub const ED: u128 = 1; }
     impl pallet_balances::Config for Test {
-        type MaxLocks = (); type MaxReserves = (); type ReserveIdentifier = [u8;8];
-        type Balance = u128; type DustRemoval = (); type RuntimeEvent = RuntimeEvent;
-        type ExistentialDeposit = ED; type AccountStore = System; type WeightInfo = ();
-        type FreezeIdentifier = (); type MaxFreezes = ();
-        type RuntimeHoldReason = (); type RuntimeFreezeReason = ();
+        type MaxLocks = ();
+        type MaxReserves = ();
+        type ReserveIdentifier = [u8; 8];
+        type Balance = u128;
+        type DustRemoval = ();
+        type RuntimeEvent = RuntimeEvent;
+        type ExistentialDeposit = ED;
+        type AccountStore = System;
+        type WeightInfo = ();
+        type FreezeIdentifier = ();
+        type MaxFreezes = ();
+        type RuntimeHoldReason = ();
+        type RuntimeFreezeReason = ();
     }
     frame_support::parameter_types! {
         pub const FCI:       u64  = 400_000_000; // $4.00
         pub const InitSupply: u128 = 1_000_000_000_000;
     }
     impl pallet::Config for Test {
-        type RuntimeEvent             = RuntimeEvent;
-        type Currency                 = Balances;
-        type Personhood               = MockId;
-        type AdminOrigin              = frame_system::EnsureRoot<u64>;
-        type FoodCostIndex            = FCI;
-        type InitialTargetSupply      = InitSupply;
-        type EquilibriumReserveDays   = ConstU32<90>;
-        type MaxDailyMintPerPerson    = ConstU32<10_000>;
-        type MaxDecayBatch            = ConstU32<50>;
+        type RuntimeEvent = RuntimeEvent;
+        type Currency = Balances;
+        type Personhood = MockId;
+        type AdminOrigin = frame_system::EnsureRoot<u64>;
+        type FoodCostIndex = FCI;
+        type InitialTargetSupply = InitSupply;
+        type EquilibriumReserveDays = ConstU32<90>;
+        type MaxDailyMintPerPerson = ConstU32<10_000>;
+        type MaxDecayBatch = ConstU32<50>;
     }
 
     fn ext() -> sp_io::TestExternalities {
-        let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
+        let mut t = frame_system::GenesisConfig::<Test>::default()
+            .build_storage()
+            .unwrap();
         pallet::GenesisConfig::<Test> {
-            initial_price:     Some(PRICE_PRECISION),
-            tx_fee_rate:       Some(Perbill::from_parts(3_000)),
-            inactivity_rate:   Some(Perbill::from_parts(10_000)),
+            initial_price: Some(PRICE_PRECISION),
+            tx_fee_rate: Some(Perbill::from_parts(3_000)),
+            inactivity_rate: Some(Perbill::from_parts(10_000)),
             wealth_decay_rate: Some(Perbill::from_parts(8_000)),
             _ph: Default::default(),
-        }.assimilate_storage(&mut t).unwrap();
+        }
+        .assimilate_storage(&mut t)
+        .unwrap();
         let mut e = sp_io::TestExternalities::new(t);
         e.execute_with(|| System::set_block_number(1));
         e
     }
 
-    #[test] fn starts_bootstrap() {
+    #[test]
+    fn starts_bootstrap() {
         ext().execute_with(|| assert_eq!(CivMon::current_phase(), Phase::Bootstrap));
     }
-    #[test] fn claim_works_first_time() {
+    #[test]
+    fn claim_works_first_time() {
         ext().execute_with(|| {
             assert_ok!(CivMon::claim_ubi(RuntimeOrigin::signed(1)));
             assert!(Balances::free_balance(1) > 0);
         });
     }
-    #[test] fn unverified_cannot_claim() {
+    #[test]
+    fn unverified_cannot_claim() {
         ext().execute_with(|| {
-            assert_noop!(CivMon::claim_ubi(RuntimeOrigin::signed(200)), Error::<Test>::NotVerified);
+            assert_noop!(
+                CivMon::claim_ubi(RuntimeOrigin::signed(200)),
+                Error::<Test>::NotVerified
+            );
         });
     }
-    #[test] fn cooldown_enforced() {
+    #[test]
+    fn cooldown_enforced() {
         ext().execute_with(|| {
             assert_ok!(CivMon::claim_ubi(RuntimeOrigin::signed(1)));
-            assert_noop!(CivMon::claim_ubi(RuntimeOrigin::signed(1)), Error::<Test>::CooldownActive);
+            assert_noop!(
+                CivMon::claim_ubi(RuntimeOrigin::signed(1)),
+                Error::<Test>::CooldownActive
+            );
         });
     }
-    #[test] fn second_claim_after_interval() {
+    #[test]
+    fn second_claim_after_interval() {
         ext().execute_with(|| {
             assert_ok!(CivMon::claim_ubi(RuntimeOrigin::signed(1)));
             System::set_block_number(14_402);
             assert_ok!(CivMon::claim_ubi(RuntimeOrigin::signed(1)));
         });
     }
-    #[test] fn higher_price_fewer_coins() {
+    #[test]
+    fn higher_price_fewer_coins() {
         ext().execute_with(|| {
+            // Set EMA high enough that base UBI < MaxDailyMintPerPerson cap (10_000),
+            // otherwise the cap dominates and price has no visible effect.
+            // base = FCI(400M) * 1M / price.  Need base < 10_000 → price > 40B.
+            pallet::EmaPrice::<Test>::put(PRICE_PRECISION * 500); // $500
+                                                                  // base = 400M * 1M / 50000M = 8000 — below cap
             assert_ok!(CivMon::claim_ubi(RuntimeOrigin::signed(1)));
             let bal1 = Balances::free_balance(1);
 
-            // Price × 4 → expect ~¼ coins
-            assert_ok!(CivMon::update_price(RuntimeOrigin::root(), PRICE_PRECISION * 12 / 10));
-            assert_ok!(CivMon::update_price(RuntimeOrigin::root(), PRICE_PRECISION * 14 / 10));
-            assert_ok!(CivMon::update_price(RuntimeOrigin::root(), PRICE_PRECISION * 17 / 10));
-            assert_ok!(CivMon::update_price(RuntimeOrigin::root(), PRICE_PRECISION * 2));
-
+            // Double the price → base halves
+            pallet::EmaPrice::<Test>::put(PRICE_PRECISION * 1000); // $1000
             System::set_block_number(14_402);
             assert_ok!(CivMon::claim_ubi(RuntimeOrigin::signed(2)));
             let bal2 = Balances::free_balance(2);
-            assert!(bal2 < bal1, "higher price should yield fewer coins: {} vs {}", bal2, bal1);
+
+            assert!(
+                bal2 < bal1,
+                "higher price should yield fewer coins: {} vs {}",
+                bal2,
+                bal1
+            );
         });
     }
-    #[test] fn oracle_rate_limit() {
+    #[test]
+    fn oracle_rate_limit() {
         ext().execute_with(|| {
             // Jump to 5× price in one call — should fail
             assert_noop!(
@@ -619,34 +739,46 @@ mod tests {
             );
         });
     }
-    #[test] fn transfer_fee_to_pool() {
+    #[test]
+    fn transfer_fee_to_pool() {
         ext().execute_with(|| {
-            Balances::force_set_balance(RuntimeOrigin::root(), 1, 100_000).ok();
-            assert_ok!(CivMon::transfer(RuntimeOrigin::signed(1), 2, 10_000));
-            assert!(CivMon::fee_pool() > 0);
+            assert_ok!(Balances::force_set_balance(
+                RuntimeOrigin::root(),
+                1,
+                1_000_000_000
+            ));
+            // TxFeeRate is 0.0003% (Perbill::from_parts(3_000)) so we need
+            // a large transfer to produce a non-zero fee after integer truncation.
+            let r = CivMon::transfer(RuntimeOrigin::signed(1), 2, 100_000_000);
+            assert!(r.is_ok(), "transfer failed: {:?}", r);
+            let pool = CivMon::fee_pool();
+            assert!(pool > 0, "fee_pool is 0 after transfer");
         });
     }
-    #[test] fn equilibrium_requires_pool_reserve() {
+    #[test]
+    fn equilibrium_requires_pool_reserve() {
         ext().execute_with(|| {
             // Force TotalMinted ≥ target but leave FeePool empty
             pallet::TotalMinted::<Test>::put(1_000_000_000_000u128);
             // Phase should stay Transition because pool is empty
             assert_eq!(CivMon::current_phase(), Phase::Transition);
             // Fill pool enough for 90 days
-            let per_day   = pallet::Pallet::<Test>::per_person_base_ubi();
-            let needed    = per_day * 10u128 * 90u128; // 10 users × 90 days
+            let per_day = pallet::Pallet::<Test>::per_person_base_ubi();
+            let needed = per_day * 10u128 * 90u128; // 10 users × 90 days
             pallet::FeePool::<Test>::put(needed + 1u128);
             assert_eq!(CivMon::current_phase(), Phase::Equilibrium);
         });
     }
-    #[test] fn rate_change_limit() {
+    #[test]
+    fn rate_change_limit() {
         ext().execute_with(|| {
             assert!(CivMon::set_rates(
                 RuntimeOrigin::root(),
                 Perbill::from_percent(5),
                 Perbill::from_parts(10_000),
                 Perbill::from_parts(8_000),
-            ).is_err());
+            )
+            .is_err());
         });
     }
 }

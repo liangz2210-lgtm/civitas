@@ -35,9 +35,9 @@ pub mod traits {
 
 #[frame_support::pallet]
 pub mod pallet {
+    use super::traits::PersonhoodProvider;
     use frame_support::pallet_prelude::*;
     use frame_system::pallet_prelude::*;
-    use super::traits::PersonhoodProvider;
 
     /// Blocks between vouch-rate-limit windows (~1 day).
     const VOUCH_WINDOW: u32 = 14_400;
@@ -50,8 +50,7 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        type RuntimeEvent: From<Event<Self>>
-            + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
         /// Multi-sig technical committee.
         /// Used ONLY for genesis bootstrap, audit flags, and audit certification.
@@ -83,15 +82,18 @@ pub mod pallet {
     /// Pending vouch count for unverified accounts.
     #[pallet::storage]
     #[pallet::getter(fn vouch_count)]
-    pub type VouchCount<T: Config> =
-        StorageMap<_, Blake2_128Concat, T::AccountId, u32, ValueQuery>;
+    pub type VouchCount<T: Config> = StorageMap<_, Blake2_128Concat, T::AccountId, u32, ValueQuery>;
 
     /// (voucher, subject) → block number. Prevents double-vouching.
     #[pallet::storage]
     pub type VouchRecord<T: Config> = StorageDoubleMap<
-        _, Blake2_128Concat, T::AccountId,
-           Blake2_128Concat, T::AccountId,
-        BlockNumberFor<T>, OptionQuery,
+        _,
+        Blake2_128Concat,
+        T::AccountId,
+        Blake2_128Concat,
+        T::AccountId,
+        BlockNumberFor<T>,
+        OptionQuery,
     >;
 
     /// Vouch rate-limit state per voucher: (window_start, count_in_window).
@@ -103,7 +105,9 @@ pub mod pallet {
     #[pallet::storage]
     #[pallet::getter(fn flag)]
     pub type AuditFlags<T: Config> = StorageMap<
-        _, Blake2_128Concat, T::AccountId,
+        _,
+        Blake2_128Concat,
+        T::AccountId,
         (BlockNumberFor<T>, BlockNumberFor<T>, [u8; 32], bool),
         OptionQuery,
     >;
@@ -119,12 +123,28 @@ pub mod pallet {
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
-        Verified    { who: T::AccountId },
-        Revoked     { who: T::AccountId },
-        VouchCast   { voucher: T::AccountId, subject: T::AccountId, total: u32 },
-        Flagged     { who: T::AccountId, deadline: BlockNumberFor<T> },
-        Challenged  { who: T::AccountId },
-        Penalised   { who: T::AccountId, revoked: bool },
+        Verified {
+            who: T::AccountId,
+        },
+        Revoked {
+            who: T::AccountId,
+        },
+        VouchCast {
+            voucher: T::AccountId,
+            subject: T::AccountId,
+            total: u32,
+        },
+        Flagged {
+            who: T::AccountId,
+            deadline: BlockNumberFor<T>,
+        },
+        Challenged {
+            who: T::AccountId,
+        },
+        Penalised {
+            who: T::AccountId,
+            revoked: bool,
+        },
         AuditDone,
     }
 
@@ -148,7 +168,6 @@ pub mod pallet {
 
     #[pallet::call]
     impl<T: Config> Pallet<T> {
-
         /// Bootstrap the founding members in a one-time public ceremony.
         /// After this call the committee has no further identity powers.
         #[pallet::call_index(0)]
@@ -171,14 +190,11 @@ pub mod pallet {
         /// Caller must be verified. Subject becomes verified at threshold.
         #[pallet::call_index(1)]
         #[pallet::weight(20_000)]
-        pub fn vouch_for(
-            origin: OriginFor<T>,
-            subject: T::AccountId,
-        ) -> DispatchResult {
+        pub fn vouch_for(origin: OriginFor<T>, subject: T::AccountId) -> DispatchResult {
             let voucher = ensure_signed(origin)?;
-            ensure!(Self::is_verified(&voucher),   Error::<T>::NotVerified);
-            ensure!(!Self::is_verified(&subject),  Error::<T>::AlreadyVerified);
-            ensure!(voucher != subject,             Error::<T>::SelfVouch);
+            ensure!(Self::is_verified(&voucher), Error::<T>::NotVerified);
+            ensure!(!Self::is_verified(&subject), Error::<T>::AlreadyVerified);
+            ensure!(voucher != subject, Error::<T>::SelfVouch);
             ensure!(
                 VouchRecord::<T>::get(&voucher, &subject).is_none(),
                 Error::<T>::AlreadyVouched
@@ -187,10 +203,15 @@ pub mod pallet {
 
             let now = frame_system::Pallet::<T>::block_number();
             VouchRecord::<T>::insert(&voucher, &subject, now);
-            let total = VouchCount::<T>::mutate(&subject, |c| { *c += 1; *c });
+            let total = VouchCount::<T>::mutate(&subject, |c| {
+                *c += 1;
+                *c
+            });
 
             Self::deposit_event(Event::VouchCast {
-                voucher, subject: subject.clone(), total,
+                voucher,
+                subject: subject.clone(),
+                total,
             });
 
             if total >= T::VouchThreshold::get() {
@@ -238,10 +259,7 @@ pub mod pallet {
         /// Anyone can call once the deadline has passed.
         #[pallet::call_index(4)]
         #[pallet::weight(15_000)]
-        pub fn execute_penalty(
-            origin: OriginFor<T>,
-            who: T::AccountId,
-        ) -> DispatchResult {
+        pub fn execute_penalty(origin: OriginFor<T>, who: T::AccountId) -> DispatchResult {
             ensure_signed(origin)?;
             let (_, deadline, _, challenged) =
                 AuditFlags::<T>::get(&who).ok_or(Error::<T>::NotFlagged)?;
@@ -317,57 +335,84 @@ pub mod pallet {
 
 #[cfg(test)]
 mod tests {
-    use super::{pallet::*, traits::PersonhoodProvider};
-    use frame_support::{assert_noop, assert_ok, traits::ConstU32};
+    use super::pallet::{Config, Error, Pallet};
+    use super::traits::PersonhoodProvider;
+    use crate as pallet_civ_identity;
+    use frame_support::{assert_noop, assert_ok, traits::ConstU32, BoundedVec};
     use sp_core::H256;
-    use sp_runtime::{traits::{BlakeTwo256, IdentityLookup}, BuildStorage};
+    use sp_runtime::{
+        traits::{BlakeTwo256, IdentityLookup},
+        BuildStorage,
+    };
 
     type Block = frame_system::mocking::MockBlock<Test>;
     frame_support::construct_runtime!(
-        pub enum Test { System: frame_system, CivId: pallet }
+        pub enum Test { System: frame_system, CivId: pallet_civ_identity }
     );
 
     impl frame_system::Config for Test {
         type BaseCallFilter = frame_support::traits::Everything;
-        type BlockWeights = (); type BlockLength = (); type DbWeight = ();
-        type RuntimeOrigin = RuntimeOrigin; type RuntimeCall = RuntimeCall;
-        type RuntimeTask = (); type Nonce = u64; type Hash = H256;
-        type Hashing = BlakeTwo256; type AccountId = u64;
-        type Lookup = IdentityLookup<u64>; type Block = Block;
-        type RuntimeEvent = RuntimeEvent; type BlockHashCount = ();
-        type Version = (); type PalletInfo = PalletInfo;
-        type AccountData = (); type OnNewAccount = (); type OnKilledAccount = ();
-        type SystemWeightInfo = (); type SS58Prefix = (); type OnSetCode = ();
+        type BlockWeights = ();
+        type BlockLength = ();
+        type DbWeight = ();
+        type RuntimeOrigin = RuntimeOrigin;
+        type RuntimeCall = RuntimeCall;
+        type RuntimeTask = ();
+        type Nonce = u64;
+        type Hash = H256;
+        type Hashing = BlakeTwo256;
+        type AccountId = u64;
+        type Lookup = IdentityLookup<u64>;
+        type Block = Block;
+        type RuntimeEvent = RuntimeEvent;
+        type BlockHashCount = ();
+        type Version = ();
+        type PalletInfo = PalletInfo;
+        type AccountData = ();
+        type OnNewAccount = ();
+        type OnKilledAccount = ();
+        type SystemWeightInfo = ();
+        type SS58Prefix = ();
+        type OnSetCode = ();
         type MaxConsumers = ConstU32<16>;
+        type SingleBlockMigrations = ();
+        type MultiBlockMigrator = ();
+        type PreInherents = ();
+        type PostInherents = ();
+        type PostTransactions = ();
     }
     impl Config for Test {
-        type RuntimeEvent    = RuntimeEvent;
+        type RuntimeEvent = RuntimeEvent;
         type CommitteeOrigin = frame_system::EnsureRoot<u64>;
-        type VouchThreshold  = ConstU32<3>;
-        type MaxBatchSize    = ConstU32<50>;
+        type VouchThreshold = ConstU32<3>;
+        type MaxBatchSize = ConstU32<50>;
     }
 
     fn ext() -> sp_io::TestExternalities {
-        let t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
+        let t = frame_system::GenesisConfig::<Test>::default()
+            .build_storage()
+            .unwrap();
         let mut e = sp_io::TestExternalities::new(t);
         e.execute_with(|| System::set_block_number(1));
         e
     }
     fn bootstrap(ids: Vec<u64>) {
-        let bv: BoundedVec<u64,ConstU32<50>> = ids.try_into().unwrap();
+        let bv: BoundedVec<u64, ConstU32<50>> = ids.try_into().unwrap();
         assert_ok!(CivId::bootstrap(RuntimeOrigin::root(), bv));
     }
 
-    #[test] fn bootstrap_verifies_all() {
+    #[test]
+    fn bootstrap_verifies_all() {
         ext().execute_with(|| {
-            bootstrap(vec![1,2,3]);
+            bootstrap(vec![1, 2, 3]);
             assert!(CivId::is_verified(1));
             assert_eq!(CivId::verified_count(), 3);
         });
     }
-    #[test] fn vouch_threshold_verifies() {
+    #[test]
+    fn vouch_threshold_verifies() {
         ext().execute_with(|| {
-            bootstrap(vec![1,2,3]);
+            bootstrap(vec![1, 2, 3]);
             assert_ok!(CivId::vouch_for(RuntimeOrigin::signed(1), 4));
             assert_ok!(CivId::vouch_for(RuntimeOrigin::signed(2), 4));
             assert!(!CivId::is_verified(4));
@@ -376,23 +421,39 @@ mod tests {
             assert_eq!(CivId::verified_count(), 4);
         });
     }
-    #[test] fn double_vouch_rejected() {
+    #[test]
+    fn double_vouch_rejected() {
         ext().execute_with(|| {
-            bootstrap(vec![1,2,3]);
+            bootstrap(vec![1, 2, 3]);
             assert_ok!(CivId::vouch_for(RuntimeOrigin::signed(1), 4));
-            assert_noop!(CivId::vouch_for(RuntimeOrigin::signed(1), 4), Error::<Test>::AlreadyVouched);
+            assert_noop!(
+                CivId::vouch_for(RuntimeOrigin::signed(1), 4),
+                Error::<Test>::AlreadyVouched
+            );
         });
     }
-    #[test] fn self_vouch_rejected() {
+    #[test]
+    fn self_vouch_rejected() {
         ext().execute_with(|| {
-            bootstrap(vec![1,2,3]);
-            assert_noop!(CivId::vouch_for(RuntimeOrigin::signed(1), 1), Error::<Test>::SelfVouch);
+            bootstrap(vec![1, 2, 3]);
+            // account 1 is verified, account 1 trying to vouch for itself (self-vouch)
+            assert_noop!(
+                CivId::vouch_for(RuntimeOrigin::signed(1), 1),
+                Error::<Test>::AlreadyVerified
+            );
+            // account 4 is NOT verified: NotVerified fires before SelfVouch
+            assert_noop!(
+                CivId::vouch_for(RuntimeOrigin::signed(4), 4),
+                Error::<Test>::NotVerified
+            );
         });
     }
-    #[test] fn audit_no_challenge_revokes() {
+    #[test]
+    fn audit_no_challenge_revokes() {
         ext().execute_with(|| {
-            bootstrap(vec![1,2,3]);
-            let batch: BoundedVec<(u64,[u8;32]),ConstU32<50>> = vec![(1,[0u8;32])].try_into().unwrap();
+            bootstrap(vec![1, 2, 3]);
+            let batch: BoundedVec<(u64, [u8; 32]), ConstU32<50>> =
+                vec![(1, [0u8; 32])].try_into().unwrap();
             assert_ok!(CivId::flag_accounts(RuntimeOrigin::root(), batch));
             System::set_block_number(432_002);
             assert_ok!(CivId::execute_penalty(RuntimeOrigin::signed(99), 1));
@@ -400,10 +461,12 @@ mod tests {
             assert_eq!(CivId::verified_count(), 2);
         });
     }
-    #[test] fn challenge_prevents_revoke() {
+    #[test]
+    fn challenge_prevents_revoke() {
         ext().execute_with(|| {
-            bootstrap(vec![1,2,3]);
-            let batch: BoundedVec<(u64,[u8;32]),ConstU32<50>> = vec![(1,[1u8;32])].try_into().unwrap();
+            bootstrap(vec![1, 2, 3]);
+            let batch: BoundedVec<(u64, [u8; 32]), ConstU32<50>> =
+                vec![(1, [1u8; 32])].try_into().unwrap();
             assert_ok!(CivId::flag_accounts(RuntimeOrigin::root(), batch));
             assert_ok!(CivId::challenge(RuntimeOrigin::signed(1)));
             System::set_block_number(432_002);
@@ -411,12 +474,16 @@ mod tests {
             assert!(CivId::is_verified(1), "challenged account keeps identity");
         });
     }
-    #[test] fn audit_certification() {
+    #[test]
+    fn audit_certification() {
         ext().execute_with(|| {
             assert!(!<Pallet<Test> as PersonhoodProvider<u64>>::audit_certified());
             assert_ok!(CivId::certify_audit(RuntimeOrigin::root()));
             assert!(<Pallet<Test> as PersonhoodProvider<u64>>::audit_certified());
-            assert_noop!(CivId::certify_audit(RuntimeOrigin::root()), Error::<Test>::AlreadyCertified);
+            assert_noop!(
+                CivId::certify_audit(RuntimeOrigin::root()),
+                Error::<Test>::AlreadyCertified
+            );
         });
     }
 }
