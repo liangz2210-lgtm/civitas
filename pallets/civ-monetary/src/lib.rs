@@ -1,3 +1,7 @@
+#![allow(deprecated)]
+#![allow(clippy::let_unit_value)]
+#![allow(clippy::type_complexity)]
+
 //! # pallet-civ-monetary
 //!
 //! Adaptive UBI issuance and fee-recycling engine.
@@ -280,15 +284,14 @@ pub mod pallet {
             let fee = TxFeeRate::<T>::get() * amount;
             let total = amount.checked_add(&fee).ok_or(Error::<T>::Overflow)?;
 
-            T::Currency::withdraw(
+            drop(T::Currency::withdraw(
                 &from,
                 total,
                 WithdrawReasons::TRANSFER,
                 ExistenceRequirement::KeepAlive,
-            )
-            .map_err(|_| Error::<T>::InsufficientBalance)?;
+            )?);
 
-            T::Currency::deposit_creating(&to, amount);
+            drop(T::Currency::deposit_creating(&to, amount));
             FeePool::<T>::mutate(|p| *p = p.saturating_add(fee));
             ActivityScore::<T>::mutate(&from, |s| *s = (*s + 1).min(100));
             LastActivity::<T>::insert(&from, frame_system::Pallet::<T>::block_number());
@@ -470,26 +473,26 @@ pub mod pallet {
             }
             match phase {
                 Phase::Bootstrap => {
-                    T::Currency::deposit_creating(who, amount);
+                    drop(T::Currency::deposit_creating(who, amount));
                     TotalMinted::<T>::mutate(|m| *m = m.saturating_add(amount));
                 }
                 Phase::Equilibrium => {
                     ensure!(FeePool::<T>::get() >= amount, Error::<T>::FeePoolEmpty);
                     FeePool::<T>::mutate(|p| *p = p.saturating_sub(amount));
-                    T::Currency::deposit_creating(who, amount);
+                    drop(T::Currency::deposit_creating(who, amount));
                 }
                 Phase::Transition => {
                     let gap = TargetSupply::<T>::get().saturating_sub(TotalMinted::<T>::get());
                     let from_mint = amount.min(gap);
                     let from_pool = amount.saturating_sub(from_mint);
                     if !from_mint.is_zero() {
-                        T::Currency::deposit_creating(who, from_mint);
+                        drop(T::Currency::deposit_creating(who, from_mint));
                         TotalMinted::<T>::mutate(|m| *m = m.saturating_add(from_mint));
                     }
                     if !from_pool.is_zero() {
                         ensure!(FeePool::<T>::get() >= from_pool, Error::<T>::FeePoolEmpty);
                         FeePool::<T>::mutate(|p| *p = p.saturating_sub(from_pool));
-                        T::Currency::deposit_creating(who, from_pool);
+                        drop(T::Currency::deposit_creating(who, from_pool));
                     }
                 }
             }

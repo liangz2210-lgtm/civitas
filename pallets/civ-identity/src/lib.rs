@@ -1,3 +1,7 @@
+#![allow(deprecated)]
+#![allow(clippy::let_unit_value)]
+#![allow(clippy::type_complexity)]
+
 //! # pallet-civ-identity
 //!
 //! Proof-of-personhood for the Civitas Protocol.

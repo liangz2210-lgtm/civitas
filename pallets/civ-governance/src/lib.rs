@@ -1,3 +1,7 @@
+#![allow(deprecated)]
+#![allow(clippy::let_unit_value)]
+#![allow(clippy::type_complexity)]
+
 //! # pallet-civ-governance
 //!
 //! Governance layer for the Civitas Protocol.
@@ -306,13 +310,12 @@ pub mod pallet {
         pub fn donate(origin: OriginFor<T>, amount: BalanceOf<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
             ensure!(T::Personhood::is_verified(&who), Error::<T>::NotVerified);
-            T::Currency::withdraw(
+            drop(T::Currency::withdraw(
                 &who,
                 amount,
                 WithdrawReasons::TRANSFER,
                 ExistenceRequirement::KeepAlive,
-            )
-            .map_err(|_| Error::<T>::InsufficientBalance)?;
+            )?);
             let (b, t, r, d) = Components::<T>::get(&who);
             let donated = amount.try_into().unwrap_or(u64::MAX);
             Components::<T>::insert(&who, (b, t, r, Self::log2(d.saturating_add(donated))));
@@ -487,13 +490,12 @@ pub mod pallet {
                 Error::<T>::NotVerified
             );
             if !self_fund.is_zero() {
-                T::Currency::withdraw(
+                drop(T::Currency::withdraw(
                     &proposer,
                     self_fund,
                     WithdrawReasons::TRANSFER,
                     ExistenceRequirement::KeepAlive,
-                )
-                .map_err(|_| Error::<T>::InsufficientBalance)?;
+                )?);
             }
             let id = NextProject::<T>::mutate(|n| {
                 let v = *n;
@@ -526,13 +528,12 @@ pub mod pallet {
             let mut proj = Projects::<T>::get(id).ok_or(Error::<T>::NotFound)?;
             ensure!(!proj.funded, Error::<T>::AlreadyFunded);
 
-            T::Currency::withdraw(
+            drop(T::Currency::withdraw(
                 &by,
                 amount,
                 WithdrawReasons::TRANSFER,
                 ExistenceRequirement::KeepAlive,
-            )
-            .map_err(|_| Error::<T>::InsufficientBalance)?;
+            )?);
 
             proj.community = proj.community.saturating_add(amount);
             Self::deposit_event(Event::Contributed { id, by, amount });
