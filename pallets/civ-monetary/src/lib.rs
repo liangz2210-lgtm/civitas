@@ -560,9 +560,9 @@ pub mod pallet {
 #[cfg(test)]
 mod tests {
     use super::pallet;
-    use super::pallet::{Config, Error, Pallet, Phase, PRICE_PRECISION};
+    use super::pallet::{Error, Phase, PRICE_PRECISION};
     use crate as pallet_civ_monetary;
-    use frame_support::{assert_noop, assert_ok, traits::ConstU32, BoundedVec};
+    use frame_support::{assert_noop, assert_ok, traits::ConstU32};
     use pallet_civ_identity::PersonhoodProvider;
     use sp_core::H256;
     use sp_runtime::{

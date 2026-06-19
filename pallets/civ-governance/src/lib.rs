@@ -624,9 +624,9 @@ pub mod pallet {
 #[cfg(test)]
 mod tests {
     use super::pallet;
-    use super::pallet::{Config, Error, Level, Pallet, Status};
+    use super::pallet::{Error, Level, Status};
     use crate as pallet_civ_governance;
-    use frame_support::{assert_noop, assert_ok, traits::ConstU32, BoundedVec};
+    use frame_support::{assert_noop, assert_ok, traits::ConstU32};
     use pallet_civ_identity::PersonhoodProvider;
     use sp_core::H256;
     use sp_runtime::{
@@ -798,7 +798,7 @@ mod tests {
             give_score(1, 1000);
             System::set_block_number(2_628_001);
             let w = CivGov::weight_of(&1u64);
-            assert!(w >= 490 && w <= 510, "expected ~500, got {}", w);
+            assert!((490..=510).contains(&w), "expected ~500, got {}", w);
         });
     }
 
