@@ -28,7 +28,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install protoc
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
-      - run: SKIP_WASM_BUILD=1 cargo clippy --all-targets -- -D warnings
+      - run: SKIP_WASM_BUILD=1 cargo clippy --all-targets --locked -- -D warnings
 
   test:
     runs-on: ubuntu-latest
@@ -39,7 +39,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install protoc
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
-      - run: SKIP_WASM_BUILD=1 cargo test --all --features std
+      - run: SKIP_WASM_BUILD=1 cargo test --all --features std --locked
 
   wasm:
     runs-on: ubuntu-latest
@@ -49,7 +49,7 @@ jobs:
         with: { targets: wasm32v1-none }
       - uses: Swatinem/rust-cache@v2
       - run: |
-          cargo build --no-default-features --target wasm32v1-none \
+          cargo build --no-default-features --target wasm32v1-none --locked \
             -p pallet-civ-identity \
             -p pallet-civ-monetary \
             -p pallet-civ-governance
@@ -58,7 +58,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install protoc
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - run: cargo install cargo-audit --locked
       - run: cargo audit --deny unsound

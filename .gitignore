@@ -4,7 +4,7 @@ target/
 *.pdb
 
 # Cargo
-Cargo.lock
+
 
 # IDE
 .idea/
