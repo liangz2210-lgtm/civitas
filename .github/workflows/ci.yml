@@ -26,6 +26,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with: { components: clippy, targets: wasm32v1-none }
       - uses: Swatinem/rust-cache@v2
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - run: SKIP_WASM_BUILD=1 cargo clippy --all-targets -- -D warnings
 
   test:
@@ -35,6 +37,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with: { targets: wasm32v1-none }
       - uses: Swatinem/rust-cache@v2
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - run: SKIP_WASM_BUILD=1 cargo test --all --features std
 
   wasm:
@@ -54,5 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - run: cargo install cargo-audit --locked
-      - run: cargo audit
+      - run: cargo audit --deny unsound
