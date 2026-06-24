@@ -83,14 +83,14 @@ pub mod pallet {
 
     // ── Types ─────────────────────────────────────────────────────────────
 
-    #[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
     pub enum Level {
         Parameter,
         Feature,
         CoreMechanism,
     }
 
-    #[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
     pub enum Status {
         Active,
         Passed,
@@ -99,7 +99,7 @@ pub mod pallet {
         Rejected,
     }
 
-    #[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
     #[scale_info(skip_type_params(T))]
     pub struct Proposal<T: Config> {
         pub id: u32,
@@ -114,7 +114,7 @@ pub mod pallet {
         pub execute_after: BlockNumberFor<T>,
     }
 
-    #[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
     #[scale_info(skip_type_params(T))]
     pub struct Project<T: Config> {
         pub id: u32,
@@ -629,6 +629,7 @@ mod tests {
     use frame_support::{assert_noop, assert_ok, traits::ConstU32};
     use pallet_civ_identity::PersonhoodProvider;
     use sp_core::H256;
+    use sp_io;
     use sp_runtime::{
         traits::{BlakeTwo256, IdentityLookup},
         BuildStorage,
@@ -687,6 +688,7 @@ mod tests {
         type PreInherents = ();
         type PostInherents = ();
         type PostTransactions = ();
+        type ExtensionsWeightInfo = ();
     }
     frame_support::parameter_types! { pub const ED: u128 = 1; }
     impl pallet_balances::Config for Test {
@@ -703,10 +705,13 @@ mod tests {
         type MaxFreezes = ();
         type RuntimeHoldReason = ();
         type RuntimeFreezeReason = ();
+        type DoneSlashHandler = ();
     }
     frame_support::parameter_types! {
-        pub const WB: u32 = 25; pub const WC: u32 = 25;
-        pub const WR: u32 = 25; pub const WD: u32 = 25;
+        pub const WB: u32 = 25;
+        pub const WC: u32 = 25;
+        pub const WR: u32 = 25;
+        pub const WD: u32 = 25;
     }
     impl pallet::Config for Test {
         type RuntimeEvent = RuntimeEvent;

@@ -344,6 +344,7 @@ mod tests {
     use crate as pallet_civ_identity;
     use frame_support::{assert_noop, assert_ok, traits::ConstU32, BoundedVec};
     use sp_core::H256;
+    use sp_io;
     use sp_runtime::{
         traits::{BlakeTwo256, IdentityLookup},
         BuildStorage,
@@ -384,6 +385,7 @@ mod tests {
         type PreInherents = ();
         type PostInherents = ();
         type PostTransactions = ();
+        type ExtensionsWeightInfo = ();
     }
     impl Config for Test {
         type RuntimeEvent = RuntimeEvent;

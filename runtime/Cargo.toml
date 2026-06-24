@@ -1,0 +1,124 @@
+[package]
+name        = "civitas-runtime"
+description = "Runtime for the Civitas Protocol solochain"
+version     = "0.1.0"
+license     = "MIT-0"
+authors.workspace    = true
+homepage.workspace   = true
+repository.workspace = true
+edition.workspace    = true
+publish = false
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+codec              = { workspace = true, features = ["derive"] }
+scale-info         = { workspace = true, features = ["derive", "serde"] }
+frame-support      = { workspace = true, features = ["experimental"] }
+frame-system       = { workspace = true }
+frame-try-runtime   = { workspace = true, optional = true }
+frame-executive    = { workspace = true }
+frame-metadata-hash-extension = { workspace = true }
+pallet-aura        = { workspace = true }
+pallet-balances    = { workspace = true }
+pallet-grandpa     = { workspace = true }
+pallet-sudo        = { workspace = true }
+pallet-timestamp   = { workspace = true }
+pallet-transaction-payment = { workspace = true }
+sp-api             = { workspace = true }
+sp-block-builder   = { workspace = true }
+sp-consensus-aura  = { workspace = true, features = ["serde"] }
+sp-consensus-grandpa = { workspace = true, features = ["serde"] }
+sp-core            = { workspace = true, features = ["serde"] }
+sp-inherents       = { workspace = true }
+sp-offchain        = { workspace = true }
+sp-runtime         = { workspace = true, features = ["serde"] }
+sp-session         = { workspace = true }
+sp-storage         = { workspace = true }
+sp-transaction-pool = { workspace = true }
+sp-version         = { workspace = true, features = ["serde"] }
+sp-genesis-builder = { workspace = true }
+serde_json = { workspace = true, default-features = false, features = ["alloc"] }
+sp-keyring = { workspace = true, optional = true }
+serde = { workspace = true, features = ["derive"], optional = true }
+frame-system-rpc-runtime-api = { workspace = true }
+pallet-transaction-payment-rpc-runtime-api = { workspace = true }
+frame-benchmarking = { workspace = true, optional = true }
+frame-system-benchmarking = { workspace = true, optional = true }
+
+# Civitas pallets (pallet_ prefix used in Rust code)
+pallet_civ_identity   = { workspace = true }
+pallet_civ_monetary   = { workspace = true }
+pallet_civ_governance = { workspace = true }
+
+[build-dependencies]
+substrate-wasm-builder = { workspace = true, optional = true }
+
+[features]
+default = ["std"]
+std = [
+    "codec/std",
+    "scale-info/std",
+    "frame-executive/std",
+    "frame-metadata-hash-extension/std",
+    "frame-support/std",
+    "frame-system-benchmarking?/std",
+    "frame-system-rpc-runtime-api/std",
+    "frame-system/std",
+    "frame-benchmarking?/std",
+    "frame-try-runtime?/std",
+    "pallet-aura/std",
+    "pallet-balances/std",
+    "pallet-grandpa/std",
+    "pallet-sudo/std",
+    "pallet-timestamp/std",
+    "pallet-transaction-payment-rpc-runtime-api/std",
+    "pallet-transaction-payment/std",
+    "sp-api/std",
+    "sp-block-builder/std",
+    "sp-consensus-aura/std",
+    "sp-consensus-grandpa/std",
+    "sp-core/std",
+    "sp-genesis-builder/std",
+    "sp-inherents/std",
+    "sp-offchain/std",
+    "sp-runtime/std",
+    "sp-session/std",
+    "sp-storage/std",
+    "sp-transaction-pool/std",
+    "sp-version/std",
+    "substrate-wasm-builder",
+    "pallet_civ_identity/std",
+    "pallet_civ_monetary/std",
+    "pallet_civ_governance/std",
+    "sp-keyring/std",
+    "serde_json/std",
+    "serde/std",
+]
+runtime-benchmarks = [
+    "frame-benchmarking/runtime-benchmarks",
+    "frame-support/runtime-benchmarks",
+    "frame-system-benchmarking/runtime-benchmarks",
+    "frame-system/runtime-benchmarks",
+    "pallet-balances/runtime-benchmarks",
+    "pallet-grandpa/runtime-benchmarks",
+    "pallet-sudo/runtime-benchmarks",
+    "pallet-timestamp/runtime-benchmarks",
+    "sp-runtime/runtime-benchmarks",
+]
+try-runtime = [
+    "frame-executive/try-runtime",
+    "frame-support/try-runtime",
+    "frame-system/try-runtime",
+    "frame-try-runtime/try-runtime",
+    "pallet-aura/try-runtime",
+    "pallet-balances/try-runtime",
+    "pallet-grandpa/try-runtime",
+    "pallet-sudo/try-runtime",
+    "pallet-timestamp/try-runtime",
+    "pallet-transaction-payment/try-runtime",
+    "sp-runtime/try-runtime",
+]
+metadata-hash = ["substrate-wasm-builder/metadata-hash"]
+on-chain-release-build = ["metadata-hash", "sp-api/disable-logging"]

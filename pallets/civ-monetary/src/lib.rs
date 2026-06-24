@@ -77,7 +77,7 @@ pub mod pallet {
 
     // ── Types ─────────────────────────────────────────────────────────────
 
-    #[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
     pub enum Phase {
         Bootstrap,
         Transition,
@@ -569,6 +569,7 @@ mod tests {
         traits::{BlakeTwo256, IdentityLookup},
         BuildStorage, Perbill,
     };
+    use sp_io;
 
     type Block = frame_system::mocking::MockBlock<Test>;
     frame_support::construct_runtime!(
@@ -618,6 +619,7 @@ mod tests {
         type PreInherents = ();
         type PostInherents = ();
         type PostTransactions = ();
+        type ExtensionsWeightInfo = ();
     }
     frame_support::parameter_types! { pub const ED: u128 = 1; }
     impl pallet_balances::Config for Test {
@@ -634,9 +636,10 @@ mod tests {
         type MaxFreezes = ();
         type RuntimeHoldReason = ();
         type RuntimeFreezeReason = ();
+        type DoneSlashHandler = ();
     }
     frame_support::parameter_types! {
-        pub const FCI:       u64  = 400_000_000; // $4.00
+        pub const FCI: u64 = 400_000_000;
         pub const InitSupply: u128 = 1_000_000_000_000;
     }
     impl pallet::Config for Test {

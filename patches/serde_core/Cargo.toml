@@ -1,0 +1,13 @@
+[package]
+name = "serde_core"
+version = "1.0.228"
+edition = "2021"
+
+[features]
+default = ["std"]
+std = ["serde/std"]
+unstable = ["serde/unstable"]
+alloc = ["serde/alloc"]
+
+[dependencies]
+serde = { path = "../serde", default-features = false }
