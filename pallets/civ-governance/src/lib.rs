@@ -83,14 +83,34 @@ pub mod pallet {
 
     // ── Types ─────────────────────────────────────────────────────────────
 
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+    #[derive(
+        Clone,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        Eq,
+        PartialEq,
+        RuntimeDebug,
+        TypeInfo,
+        MaxEncodedLen,
+    )]
     pub enum Level {
         Parameter,
         Feature,
         CoreMechanism,
     }
 
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+    #[derive(
+        Clone,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        Eq,
+        PartialEq,
+        RuntimeDebug,
+        TypeInfo,
+        MaxEncodedLen,
+    )]
     pub enum Status {
         Active,
         Passed,
@@ -99,7 +119,17 @@ pub mod pallet {
         Rejected,
     }
 
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+    #[derive(
+        Clone,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        Eq,
+        PartialEq,
+        RuntimeDebug,
+        TypeInfo,
+        MaxEncodedLen,
+    )]
     #[scale_info(skip_type_params(T))]
     pub struct Proposal<T: Config> {
         pub id: u32,
@@ -114,7 +144,17 @@ pub mod pallet {
         pub execute_after: BlockNumberFor<T>,
     }
 
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+    #[derive(
+        Clone,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        Eq,
+        PartialEq,
+        RuntimeDebug,
+        TypeInfo,
+        MaxEncodedLen,
+    )]
     #[scale_info(skip_type_params(T))]
     pub struct Project<T: Config> {
         pub id: u32,
@@ -629,7 +669,7 @@ mod tests {
     use frame_support::{assert_noop, assert_ok, traits::ConstU32};
     use pallet_civ_identity::PersonhoodProvider;
     use sp_core::H256;
-    use sp_io;
+
     use sp_runtime::{
         traits::{BlakeTwo256, IdentityLookup},
         BuildStorage,

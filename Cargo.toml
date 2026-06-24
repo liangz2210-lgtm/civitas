@@ -104,7 +104,7 @@ prometheus               = { version = "0.13.4" }
 [patch.crates-io]
 core2 = { git = "https://github.com/technocreatives/core2", branch = "main" }
 serde       = { path = "./patches/serde" }
-serde_derive = { path = "/home/yang/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_derive-1.0.219" }
+serde_derive = { path = "./patches/serde_derive" }
 serde_core  = { path = "./patches/serde_core" }
 
 [profile.release]

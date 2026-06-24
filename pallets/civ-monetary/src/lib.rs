@@ -77,7 +77,17 @@ pub mod pallet {
 
     // ── Types ─────────────────────────────────────────────────────────────
 
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+    #[derive(
+        Clone,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        Eq,
+        PartialEq,
+        RuntimeDebug,
+        TypeInfo,
+        MaxEncodedLen,
+    )]
     pub enum Phase {
         Bootstrap,
         Transition,
@@ -565,11 +575,11 @@ mod tests {
     use frame_support::{assert_noop, assert_ok, traits::ConstU32};
     use pallet_civ_identity::PersonhoodProvider;
     use sp_core::H256;
+
     use sp_runtime::{
         traits::{BlakeTwo256, IdentityLookup},
         BuildStorage, Perbill,
     };
-    use sp_io;
 
     type Block = frame_system::mocking::MockBlock<Test>;
     frame_support::construct_runtime!(

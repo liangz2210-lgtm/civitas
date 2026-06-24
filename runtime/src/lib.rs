@@ -10,11 +10,12 @@ pub mod configs;
 pub mod genesis_config_presets;
 
 extern crate alloc;
+use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use sp_runtime::{
-	create_runtime_str, generic, impl_opaque_keys,
-	traits::{BlakeTwo256, IdentifyAccount, Verify},
-	MultiAddress, MultiSignature,
+    generic, impl_opaque_keys,
+    traits::{BlakeTwo256, IdentifyAccount, Verify},
+    MultiAddress, MultiSignature,
 };
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
@@ -28,39 +29,42 @@ pub use sp_runtime::BuildStorage;
 
 /// Opaque types used by the CLI.
 pub mod opaque {
-	use super::*;
-	use sp_runtime::{generic, traits::{BlakeTwo256, Hash as HashT}};
+    use super::*;
+    use sp_runtime::{
+        generic,
+        traits::{BlakeTwo256, Hash as HashT},
+    };
 
-	pub use sp_runtime::OpaqueExtrinsic as UncheckedExtrinsic;
+    pub use sp_runtime::OpaqueExtrinsic as UncheckedExtrinsic;
 
-	pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
-	pub type Block = generic::Block<Header, UncheckedExtrinsic>;
-	pub type BlockId = generic::BlockId<Block>;
-	pub type Hash = <BlakeTwo256 as HashT>::Output;
+    pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
+    pub type Block = generic::Block<Header, UncheckedExtrinsic>;
+    pub type BlockId = generic::BlockId<Block>;
+    pub type Hash = <BlakeTwo256 as HashT>::Output;
 }
 
 impl_opaque_keys! {
-	pub struct SessionKeys {
-		pub aura: Aura,
-		pub grandpa: Grandpa,
-	}
+    pub struct SessionKeys {
+        pub aura: Aura,
+        pub grandpa: Grandpa,
+    }
 }
 
 #[sp_version::runtime_version]
 pub const VERSION: RuntimeVersion = RuntimeVersion {
-	spec_name: create_runtime_str!("civitas-runtime"),
-	impl_name: create_runtime_str!("civitas-runtime"),
-	authoring_version: 1,
-	spec_version: 100,
-	impl_version: 1,
-	apis: apis::RUNTIME_API_VERSIONS,
-	transaction_version: 1,
-	system_version: 1,
+    spec_name: Cow::Borrowed("civitas-runtime"),
+    impl_name: Cow::Borrowed("civitas-runtime"),
+    authoring_version: 1,
+    spec_version: 100,
+    impl_version: 1,
+    apis: apis::RUNTIME_API_VERSIONS,
+    transaction_version: 1,
+    system_version: 1,
 };
 
 mod block_times {
-	pub const MILLI_SECS_PER_BLOCK: u64 = 6000;
-	pub const SLOT_DURATION: u64 = MILLI_SECS_PER_BLOCK;
+    pub const MILLI_SECS_PER_BLOCK: u64 = 6000;
+    pub const SLOT_DURATION: u64 = MILLI_SECS_PER_BLOCK;
 }
 pub use block_times::*;
 
@@ -81,7 +85,10 @@ pub const EXISTENTIAL_DEPOSIT: Balance = MILLI_UNIT;
 /// The version information used to identify this runtime when compiled natively.
 #[cfg(feature = "std")]
 pub fn native_version() -> NativeVersion {
-	NativeVersion { runtime_version: VERSION, can_author_with: Default::default() }
+    NativeVersion {
+        runtime_version: VERSION,
+        can_author_with: Default::default(),
+    }
 }
 
 /// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
@@ -119,20 +126,20 @@ pub type BlockId = generic::BlockId<Block>;
 
 /// The SignedExtension to the basic transaction logic.
 pub type SignedExtra = (
-	frame_system::CheckNonZeroSender<Runtime>,
-	frame_system::CheckSpecVersion<Runtime>,
-	frame_system::CheckTxVersion<Runtime>,
-	frame_system::CheckGenesis<Runtime>,
-	frame_system::CheckEra<Runtime>,
-	frame_system::CheckNonce<Runtime>,
-	frame_system::CheckWeight<Runtime>,
-	pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
-	frame_metadata_hash_extension::CheckMetadataHash<Runtime>,
+    frame_system::CheckNonZeroSender<Runtime>,
+    frame_system::CheckSpecVersion<Runtime>,
+    frame_system::CheckTxVersion<Runtime>,
+    frame_system::CheckGenesis<Runtime>,
+    frame_system::CheckEra<Runtime>,
+    frame_system::CheckNonce<Runtime>,
+    frame_system::CheckWeight<Runtime>,
+    pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
+    frame_metadata_hash_extension::CheckMetadataHash<Runtime>,
 );
 
 /// Unchecked extrinsic type as expected by this runtime.
 pub type UncheckedExtrinsic =
-	generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra>;
+    generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra>;
 
 /// The payload being signed in transactions.
 pub type SignedPayload = generic::SignedPayload<RuntimeCall, SignedExtra>;
@@ -143,58 +150,58 @@ type Migrations = ();
 
 /// Executive: handles dispatch to the various modules.
 pub type Executive = frame_executive::Executive<
-	Runtime,
-	Block,
-	frame_system::ChainContext<Runtime>,
-	Runtime,
-	AllPalletsWithSystem,
-	Migrations,
+    Runtime,
+    Block,
+    frame_system::ChainContext<Runtime>,
+    Runtime,
+    AllPalletsWithSystem,
+    Migrations,
 >;
 
 // Create the runtime by composing the FRAME pallets.
 #[frame_support::runtime]
 mod runtime {
-	#[runtime::runtime]
-	#[runtime::derive(
-		RuntimeCall,
-		RuntimeEvent,
-		RuntimeError,
-		RuntimeOrigin,
-		RuntimeFreezeReason,
-		RuntimeHoldReason,
-		RuntimeSlashReason,
-		RuntimeLockId,
-		RuntimeTask
-	)]
-	pub struct Runtime;
+    #[runtime::runtime]
+    #[runtime::derive(
+        RuntimeCall,
+        RuntimeEvent,
+        RuntimeError,
+        RuntimeOrigin,
+        RuntimeFreezeReason,
+        RuntimeHoldReason,
+        RuntimeSlashReason,
+        RuntimeLockId,
+        RuntimeTask
+    )]
+    pub struct Runtime;
 
-	#[runtime::pallet_index(0)]
-	pub type System = frame_system;
+    #[runtime::pallet_index(0)]
+    pub type System = frame_system;
 
-	#[runtime::pallet_index(1)]
-	pub type Timestamp = pallet_timestamp;
+    #[runtime::pallet_index(1)]
+    pub type Timestamp = pallet_timestamp;
 
-	#[runtime::pallet_index(2)]
-	pub type Aura = pallet_aura;
+    #[runtime::pallet_index(2)]
+    pub type Aura = pallet_aura;
 
-	#[runtime::pallet_index(3)]
-	pub type Grandpa = pallet_grandpa;
+    #[runtime::pallet_index(3)]
+    pub type Grandpa = pallet_grandpa;
 
-	#[runtime::pallet_index(4)]
-	pub type Balances = pallet_balances;
+    #[runtime::pallet_index(4)]
+    pub type Balances = pallet_balances;
 
-	#[runtime::pallet_index(5)]
-	pub type TransactionPayment = pallet_transaction_payment;
+    #[runtime::pallet_index(5)]
+    pub type TransactionPayment = pallet_transaction_payment;
 
-	#[runtime::pallet_index(6)]
-	pub type Sudo = pallet_sudo;
+    #[runtime::pallet_index(6)]
+    pub type Sudo = pallet_sudo;
 
-	#[runtime::pallet_index(10)]
-	pub type CivIdentity = pallet_civ_identity;
+    #[runtime::pallet_index(10)]
+    pub type CivIdentity = pallet_civ_identity;
 
-	#[runtime::pallet_index(11)]
-	pub type CivMonetary = pallet_civ_monetary;
+    #[runtime::pallet_index(11)]
+    pub type CivMonetary = pallet_civ_monetary;
 
-	#[runtime::pallet_index(12)]
-	pub type CivGovernance = pallet_civ_governance;
+    #[runtime::pallet_index(12)]
+    pub type CivGovernance = pallet_civ_governance;
 }

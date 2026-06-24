@@ -27,7 +27,7 @@ mod string {
     use crate::lib::*;
 
     #[cfg(any(feature = "std", feature = "alloc"))]
-    pub fn from_utf8_lossy(bytes: &[u8]) -> Cow<str> {
+    pub fn from_utf8_lossy(bytes: &[u8]) -> Cow<'_, str> {
         String::from_utf8_lossy(bytes)
     }
 
