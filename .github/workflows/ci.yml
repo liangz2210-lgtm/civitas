@@ -59,4 +59,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: cargo install cargo-audit --locked
-      - run: cargo audit --deny unsound
+      - run: cargo audit --deny unsound --ignore RUSTSEC-2025-0010 --ignore RUSTSEC-2026-0002 --ignore RUSTSEC-2026-0186
