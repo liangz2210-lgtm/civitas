@@ -1,8 +1,12 @@
-use crate::{AccountId, BalancesConfig, RuntimeGenesisConfig, SudoConfig};
+use crate::{
+    AccountId, BalancesConfig, CivGovernanceConfig, CivMonetaryConfig, RuntimeGenesisConfig,
+    SudoConfig,
+};
 use alloc::{vec, vec::Vec};
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_genesis_builder::{self, PresetId};
+use sp_runtime::Perbill;
 
 #[cfg(feature = "std")]
 use frame_support::build_struct_json_patch;
@@ -38,6 +42,16 @@ fn testnet_genesis(
                 .collect::<Vec<_>>(),
         },
         sudo: SudoConfig { key: Some(root) },
+        // Civitas: initialize monetary & governance chain parameters at genesis
+        civ_monetary: CivMonetaryConfig {
+            initial_price: Some(100_000_000), // $1.00 in PRICE_PRECISION
+            tx_fee_rate: Some(Perbill::from_parts(3_000)), // 0.3%
+            inactivity_rate: Some(Perbill::from_parts(10_000)), // 1%
+            wealth_decay_rate: Some(Perbill::from_parts(8_000)), // 0.8%
+        },
+        civ_governance: CivGovernanceConfig {
+            match_multiplier: Some(2), // 2x match on donations
+        },
     })
 }
 

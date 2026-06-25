@@ -118,5 +118,14 @@ fn testnet_genesis(
             // Assign network admin rights.
             "key": Some(root_key),
         },
+        "civMonetary": {
+            "initialPrice": 100_000_000,
+            "txFeeRate": "300000000",
+            "inactivityRate": "1000000000",
+            "wealthDecayRate": "800000000",
+        },
+        "civGovernance": {
+            "matchMultiplier": 2,
+        },
     })
 }
