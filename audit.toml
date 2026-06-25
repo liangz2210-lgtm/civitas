@@ -1,0 +1,4 @@
+[advisory]
+ignore = [
+    "RUSTSEC-2024-0442",  # wasmtime-jit-debug: unsound - Substrate upstream dependency, not fixable by us
+]
