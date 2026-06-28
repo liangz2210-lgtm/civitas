@@ -316,12 +316,16 @@ pub mod pallet {
             let day = now_u32 / CLAIM_INTERVAL;
             let mut dm = DayMintStore::<T>::get();
             let daily_cap = Self::per_person_base_ubi()
-                .saturating_mul(BalanceOf::<T>::from(
-                    T::Personhood::verified_count() as u32
-                ))
+                .saturating_mul(BalanceOf::<T>::from(T::Personhood::verified_count() as u32))
                 .saturating_mul(BalanceOf::<T>::from(BREAKER_MULTIPLIER as u32));
             let new_state = circuit_breaker::record_mint(
-                &breaker, &mut dm, amount, day, daily_cap, now_u32, BREAKER_COOLDOWN,
+                &breaker,
+                &mut dm,
+                amount,
+                day,
+                daily_cap,
+                now_u32,
+                BREAKER_COOLDOWN,
             );
             if !matches!(new_state, circuit_breaker::BreakerState::Closed) {
                 Self::deposit_event(Event::CircuitBreakerTripped { day });

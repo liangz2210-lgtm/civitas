@@ -2,6 +2,15 @@
 //!
 //! Constitutional guard layer for the Civitas Protocol.
 //!
+
+// Substrate pallet macros generate code that triggers these lints:
+#![allow(
+    deprecated,
+    clippy::let_unit_value,
+    clippy::type_complexity,
+    clippy::result_unit_err
+)]
+
 //! ## Purpose
 //!
 //! Four inviolable invariants encoded on-chain. Every state-mutating
@@ -87,8 +96,7 @@ pub mod pallet {
     /// (disabling requires a CoreMechanism proposal + 180-day timelock).
     #[pallet::storage]
     #[pallet::getter(fn invariant_enabled)]
-    pub type InvariantEnabled<T: Config> =
-        StorageMap<_, Identity, u8, bool, ValueQuery>;
+    pub type InvariantEnabled<T: Config> = StorageMap<_, Identity, u8, bool, ValueQuery>;
 
     /// Log of every parameter / policy change for transparency.
     /// (block, caller, change_hash)
@@ -222,7 +230,8 @@ pub mod pallet {
                 return Ok(());
             }
             ensure!(
-                balance <= (median as u128).saturating_mul(T::AccumulationRatio::get() as u128) as u64,
+                balance
+                    <= (median as u128).saturating_mul(T::AccumulationRatio::get() as u128) as u64,
                 Error::<T>::ConstitutionalViolation
             );
             Ok(())
@@ -256,8 +265,8 @@ pub mod pallet {
 
 #[cfg(test)]
 mod tests {
-    use super::pallet::{Config, Error, Pallet, InvariantEnabled};
     use super::guard::ConstitutionGuard;
+    use super::pallet::{Config, Error, InvariantEnabled, Pallet};
     use crate as pallet_civ_constitution;
     use frame_support::{assert_noop, assert_ok, traits::ConstU32};
     use sp_core::H256;
@@ -329,7 +338,11 @@ mod tests {
     fn all_invariants_enabled_at_genesis() {
         ext().execute_with(|| {
             for id in 0u8..4 {
-                assert!(CivCon::invariant_enabled(id), "invariant {} not enabled", id);
+                assert!(
+                    CivCon::invariant_enabled(id),
+                    "invariant {} not enabled",
+                    id
+                );
             }
         });
     }
@@ -348,7 +361,10 @@ mod tests {
     fn guard_fails_when_disabled() {
         ext().execute_with(|| {
             InvariantEnabled::<Test>::insert(0, false);
-            assert_noop!(Pallet::<Test>::guard(0), Error::<Test>::ConstitutionalViolation);
+            assert_noop!(
+                Pallet::<Test>::guard(0),
+                Error::<Test>::ConstitutionalViolation
+            );
         });
     }
 

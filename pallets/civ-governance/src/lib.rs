@@ -629,14 +629,27 @@ pub mod pallet {
         /// V0.1: simple count — V0.2 adds activity-gating & time-decay.
         #[pallet::call_index(11)]
         #[pallet::weight(10_000)]
-        pub fn record_referral(origin: OriginFor<T>, referrer: T::AccountId, referral_id: T::AccountId) -> DispatchResult {
+        pub fn record_referral(
+            origin: OriginFor<T>,
+            referrer: T::AccountId,
+            referral_id: T::AccountId,
+        ) -> DispatchResult {
             let _who = ensure_signed(origin)?;
-            ensure!(T::Personhood::is_verified(&referrer), Error::<T>::NotVerified);
-            ensure!(T::Personhood::is_verified(&referral_id), Error::<T>::NotVerified);
+            ensure!(
+                T::Personhood::is_verified(&referrer),
+                Error::<T>::NotVerified
+            );
+            ensure!(
+                T::Personhood::is_verified(&referral_id),
+                Error::<T>::NotVerified
+            );
             ensure!(referrer != referral_id, Error::<T>::NotVerified); // no self-referral
 
             let count = ReferralCount::<T>::get(&referrer);
-            ensure!(referral::can_refer(count), DispatchError::Other("referral full"));
+            ensure!(
+                referral::can_refer(count),
+                DispatchError::Other("referral full")
+            );
 
             let now = frame_system::Pallet::<T>::block_number();
             let rec = referral::ReferralRecord::<T::AccountId, BlockNumberFor<T>> {

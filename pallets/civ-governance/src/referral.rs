@@ -15,7 +15,15 @@ pub const MAX_REFERRALS_PER_USER: u32 = 100;
 /// so that the `TypeInfo` bound is satisfied without requiring
 /// `T: TypeInfo` on the pallet Config.
 #[derive(
-    Clone, Encode, Decode, DecodeWithMemTracking, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen,
+    Clone,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    Eq,
+    PartialEq,
+    RuntimeDebug,
+    TypeInfo,
+    MaxEncodedLen,
 )]
 pub struct ReferralRecord<AccountId, BlockNumber> {
     /// The referrer (person who invited).
@@ -31,7 +39,9 @@ pub struct ReferralRecord<AccountId, BlockNumber> {
 /// Compute a referral score for a referrer given their referrals.
 /// V0.1: simple count of activated referrals.
 /// V0.2: time-weighted + activity-weighted.
-pub fn referral_score<AccountId, BlockNumber>(referrals: &[ReferralRecord<AccountId, BlockNumber>]) -> u32 {
+pub fn referral_score<AccountId, BlockNumber>(
+    referrals: &[ReferralRecord<AccountId, BlockNumber>],
+) -> u32 {
     referrals.iter().filter(|r| r.activated).count() as u32
 }
 

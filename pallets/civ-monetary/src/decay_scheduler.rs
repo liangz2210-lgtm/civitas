@@ -45,11 +45,7 @@ fn days_active_cap(days: u32) -> u32 {
 
 /// Apply wealth decay (flat Perbill on balance above median).
 /// Only the *excess* above median is decayed.
-pub fn apply_wealth_decay<Balance>(
-    balance: Balance,
-    median: Balance,
-    rate: Perbill,
-) -> Balance
+pub fn apply_wealth_decay<Balance>(balance: Balance, median: Balance, rate: Perbill) -> Balance
 where
     Balance: Saturating + Copy + PartialOrd + From<u32> + Into<u64>,
 {

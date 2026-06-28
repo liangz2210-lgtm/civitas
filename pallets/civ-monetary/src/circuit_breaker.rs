@@ -13,19 +13,23 @@ use sp_runtime::traits::{Saturating, Zero};
 
 /// Circuit breaker state.
 #[derive(
-    Clone, Encode, Decode, DecodeWithMemTracking, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen,
+    Clone,
+    Encode,
+    Decode,
+    DecodeWithMemTracking,
+    Eq,
+    PartialEq,
+    RuntimeDebug,
+    TypeInfo,
+    MaxEncodedLen,
+    Default,
 )]
 pub enum BreakerState {
     /// Normal operation.
+    #[default]
     Closed,
     /// Minting exceeded threshold — all minting blocked.
     Open { tripped_at: u32 },
-}
-
-impl Default for BreakerState {
-    fn default() -> Self {
-        Self::Closed
-    }
 }
 
 /// Per-day mint tracking for the breaker.
@@ -48,11 +52,7 @@ pub struct DayMint<Balance> {
 
 /// Check whether the circuit breaker allows minting.
 /// Returns Ok(()) if minting is allowed, Err otherwise.
-pub fn check_breaker(
-    state: &BreakerState,
-    cooldown_blocks: u32,
-    now: u32,
-) -> DispatchResult {
+pub fn check_breaker(state: &BreakerState, cooldown_blocks: u32, now: u32) -> DispatchResult {
     match state {
         BreakerState::Closed => Ok(()),
         BreakerState::Open { tripped_at } => {
