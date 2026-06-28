@@ -12,7 +12,7 @@ frame-system        = { workspace = true }
 sp-runtime          = { workspace = true }
 sp-std              = { workspace = true }
 scale-info          = { workspace = true }
-parity-scale-codec  = { workspace = true }
+codec               = { workspace = true }
 pallet-civ-identity = { workspace = true }
 
 [dev-dependencies]
@@ -24,6 +24,6 @@ pallet-balances = { workspace = true }
 default = ["std"]
 std = [
     "frame-support/std", "frame-system/std", "sp-runtime/std", "sp-std/std",
-    "scale-info/std", "parity-scale-codec/std",
+    "scale-info/std", "codec/std",
     "pallet-civ-identity/std", "pallet-balances/std",
 ]

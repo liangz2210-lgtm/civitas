@@ -122,6 +122,24 @@ pub mod pallet {
     #[pallet::getter(fn audit_certified)]
     pub type AuditCertified<T: Config> = StorageValue<_, bool, ValueQuery>;
 
+    /// (referrer, referral) → block number. Prevents duplicate referrals.
+    #[pallet::storage]
+    pub type ReferralRecord<T: Config> = StorageDoubleMap<
+        _,
+        Blake2_128Concat,
+        T::AccountId,
+        Blake2_128Concat,
+        T::AccountId,
+        BlockNumberFor<T>,
+        OptionQuery,
+    >;
+
+    /// Number of referrals made by each account.
+    #[pallet::storage]
+    #[pallet::getter(fn referral_count)]
+    pub type ReferralCount<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, u32, ValueQuery>;
+
     // ── Events ────────────────────────────────────────────────────────────
 
     #[pallet::event]
@@ -150,6 +168,11 @@ pub mod pallet {
             revoked: bool,
         },
         AuditDone,
+        /// A referral was recorded.
+        ReferralRecorded {
+            referrer: T::AccountId,
+            referral: T::AccountId,
+        },
     }
 
     // ── Errors ────────────────────────────────────────────────────────────
@@ -166,6 +189,7 @@ pub mod pallet {
         AlreadyChallenged,
         AlreadyCertified,
         SelfReferral,
+        AlreadyReferred,
     }
 
     // ── Calls ─────────────────────────────────────────────────────────────
@@ -290,6 +314,36 @@ pub mod pallet {
             ensure!(!AuditCertified::<T>::get(), Error::<T>::AlreadyCertified);
             AuditCertified::<T>::put(true);
             Self::deposit_event(Event::AuditDone);
+            Ok(())
+        }
+
+        /// Record that `referrer` referred `referral_id` into the network.
+        /// V0.1 stub: stores a simple referral map. V0.2 wires into governance score.
+        /// Both accounts must be verified. No self-referral.
+        #[pallet::call_index(6)]
+        #[pallet::weight(10_000)]
+        pub fn record_referral(
+            origin: OriginFor<T>,
+            referrer: T::AccountId,
+            referral_id: T::AccountId,
+        ) -> DispatchResult {
+            let _who = ensure_signed(origin)?;
+            ensure!(Self::is_verified(&referrer), Error::<T>::NotVerified);
+            ensure!(Self::is_verified(&referral_id), Error::<T>::NotVerified);
+            ensure!(referrer != referral_id, Error::<T>::SelfReferral);
+            ensure!(
+                ReferralRecord::<T>::get(&referrer, &referral_id).is_none(),
+                Error::<T>::AlreadyReferred
+            );
+
+            let now = frame_system::Pallet::<T>::block_number();
+            ReferralRecord::<T>::insert(&referrer, &referral_id, now);
+            ReferralCount::<T>::mutate(&referrer, |c| *c += 1);
+
+            Self::deposit_event(Event::ReferralRecorded {
+                referrer,
+                referral: referral_id,
+            });
             Ok(())
         }
     }

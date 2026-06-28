@@ -44,6 +44,10 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 pub use pallet::*;
 
+pub mod activity;
+pub mod circuit_breaker;
+pub mod decay_scheduler;
+
 #[frame_support::pallet]
 pub mod pallet {
     use frame_support::{
@@ -56,6 +60,9 @@ pub mod pallet {
         traits::{CheckedAdd, Saturating, Zero},
         Perbill,
     };
+
+    use crate::activity;
+    use crate::circuit_breaker;
 
     pub type BalanceOf<T> =
         <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -74,6 +81,10 @@ pub mod pallet {
     const MAX_PRICE_CHANGE_PCT: u64 = 20;
     /// β and γ hard ceiling regardless of stabiliser.
     const MAX_DECAY_RATE: Perbill = Perbill::from_percent(5);
+    /// Circuit breaker cooldown (~1 day).
+    pub const BREAKER_COOLDOWN: u32 = 14_400;
+    /// Circuit breaker daily cap: 5× expected daily mint for all users.
+    pub const BREAKER_MULTIPLIER: u64 = 5;
 
     // ── Types ─────────────────────────────────────────────────────────────
 
@@ -169,6 +180,18 @@ pub mod pallet {
     #[pallet::getter(fn wealth_decay_rate)]
     pub type WealthDecayRate<T: Config> = StorageValue<_, Perbill, ValueQuery>;
 
+    /// Circuit breaker state.
+    #[pallet::storage]
+    #[pallet::getter(fn breaker_state)]
+    pub type BreakerStateStore<T: Config> =
+        StorageValue<_, circuit_breaker::BreakerState, ValueQuery>;
+
+    /// Daily mint tracking for circuit breaker.
+    #[pallet::storage]
+    #[pallet::getter(fn day_mint)]
+    pub type DayMintStore<T: Config> =
+        StorageValue<_, circuit_breaker::DayMint<BalanceOf<T>>, ValueQuery>;
+
     // ── Genesis ───────────────────────────────────────────────────────────
 
     #[pallet::genesis_config]
@@ -237,6 +260,10 @@ pub mod pallet {
         TargetUpdated {
             new_target: BalanceOf<T>,
         },
+        CircuitBreakerTripped {
+            day: u32,
+        },
+        CircuitBreakerReset,
     }
 
     // ── Errors ────────────────────────────────────────────────────────────
@@ -251,6 +278,7 @@ pub mod pallet {
         InvalidPrice,
         PriceChangeTooLarge,
         RateChangeTooLarge,
+        CircuitBreakerOpen,
     }
 
     // ── Calls ─────────────────────────────────────────────────────────────
@@ -258,13 +286,21 @@ pub mod pallet {
     #[pallet::call]
     impl<T: Config> Pallet<T> {
         /// Claim daily UBI. Amount = FCI / EMA(price) × ActivityFactor.
+        /// Protected by circuit breaker — trips if daily mint exceeds cap.
         #[pallet::call_index(0)]
         #[pallet::weight(50_000)]
         pub fn claim_ubi(origin: OriginFor<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
             ensure!(T::Personhood::is_verified(&who), Error::<T>::NotVerified);
 
-            let now = frame_system::Pallet::<T>::block_number();
+            // Circuit breaker check
+            let now_block = frame_system::Pallet::<T>::block_number();
+            let now_u32: u32 = now_block.try_into().unwrap_or(0);
+            let breaker = BreakerStateStore::<T>::get();
+            circuit_breaker::check_breaker(&breaker, BREAKER_COOLDOWN, now_u32)
+                .map_err(|_| Error::<T>::CircuitBreakerOpen)?;
+
+            let now = now_block;
             if let Some(last) = LastClaim::<T>::get(&who) {
                 ensure!(
                     now >= last + CLAIM_INTERVAL.into(),
@@ -275,6 +311,23 @@ pub mod pallet {
             let amount = Self::ubi_amount(&who);
             let phase = Self::current_phase();
             Self::issue_ubi(&who, amount, &phase)?;
+
+            // Record mint in circuit breaker & update state
+            let day = now_u32 / CLAIM_INTERVAL;
+            let mut dm = DayMintStore::<T>::get();
+            let daily_cap = Self::per_person_base_ubi()
+                .saturating_mul(BalanceOf::<T>::from(
+                    T::Personhood::verified_count() as u32
+                ))
+                .saturating_mul(BalanceOf::<T>::from(BREAKER_MULTIPLIER as u32));
+            let new_state = circuit_breaker::record_mint(
+                &breaker, &mut dm, amount, day, daily_cap, now_u32, BREAKER_COOLDOWN,
+            );
+            if !matches!(new_state, circuit_breaker::BreakerState::Closed) {
+                Self::deposit_event(Event::CircuitBreakerTripped { day });
+            }
+            BreakerStateStore::<T>::put(new_state);
+            DayMintStore::<T>::put(dm);
 
             LastClaim::<T>::insert(&who, now);
             LastActivity::<T>::insert(&who, now);
@@ -303,7 +356,7 @@ pub mod pallet {
 
             drop(T::Currency::deposit_creating(&to, amount));
             FeePool::<T>::mutate(|p| *p = p.saturating_add(fee));
-            ActivityScore::<T>::mutate(&from, |s| *s = (*s + 1).min(100));
+            ActivityScore::<T>::mutate(&from, |s| *s = (*s + 1).min(activity::MAX_ACTIVITY_SCORE));
             LastActivity::<T>::insert(&from, frame_system::Pallet::<T>::block_number());
 
             Self::deposit_event(Event::Transferred {
@@ -423,6 +476,16 @@ pub mod pallet {
             Self::deposit_event(Event::TargetUpdated { new_target });
             Ok(())
         }
+
+        /// Governance: manually reset the circuit breaker (root only).
+        #[pallet::call_index(6)]
+        #[pallet::weight(3_000)]
+        pub fn reset_breaker(origin: OriginFor<T>) -> DispatchResult {
+            T::AdminOrigin::ensure_origin(origin)?;
+            BreakerStateStore::<T>::put(circuit_breaker::BreakerState::Closed);
+            Self::deposit_event(Event::CircuitBreakerReset);
+            Ok(())
+        }
     }
 
     // ── Internals ─────────────────────────────────────────────────────────
@@ -460,9 +523,9 @@ pub mod pallet {
 
         fn ubi_amount(who: &T::AccountId) -> BalanceOf<T> {
             let base = Self::per_person_base_ubi();
-            let score = ActivityScore::<T>::get(who).min(100);
-            // ActivityFactor = (50 + score) / 100
-            Perbill::from_rational(50u32 + score, 100u32) * base
+            let score = ActivityScore::<T>::get(who).min(activity::MAX_ACTIVITY_SCORE);
+            let factor = activity::activity_factor(score);
+            factor * base
         }
 
         /// Base UBI = FCI / EMA(price), clamped to MaxDailyMintPerPerson.

@@ -204,4 +204,7 @@ mod runtime {
 
     #[runtime::pallet_index(12)]
     pub type CivGovernance = pallet_civ_governance;
+
+    #[runtime::pallet_index(13)]
+    pub type CivConstitution = pallet_civ_constitution;
 }

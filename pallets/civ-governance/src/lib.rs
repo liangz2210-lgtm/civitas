@@ -56,6 +56,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 pub use pallet::*;
 
+pub mod referral;
+
 #[frame_support::pallet]
 pub mod pallet {
     use frame_support::{
@@ -65,6 +67,8 @@ pub mod pallet {
     use frame_system::pallet_prelude::*;
     use pallet_civ_identity::PersonhoodProvider;
     use sp_runtime::traits::{Saturating, Zero};
+
+    use crate::referral;
 
     pub type BalanceOf<T> =
         <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -232,6 +236,23 @@ pub mod pallet {
     #[pallet::getter(fn match_multiplier)]
     pub type MatchMultiplier<T: Config> = StorageValue<_, u32, ValueQuery>;
 
+    /// Referral tracking: referrer → list of their referrals.
+    #[pallet::storage]
+    #[pallet::getter(fn referrals)]
+    pub type Referrals<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        T::AccountId,
+        BoundedVec<referral::ReferralRecord<T::AccountId, BlockNumberFor<T>>, ConstU32<100>>,
+        ValueQuery,
+    >;
+
+    /// Referral count per referrer (denormalised for quick cap check).
+    #[pallet::storage]
+    #[pallet::getter(fn referral_count)]
+    pub type ReferralCount<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, u32, ValueQuery>;
+
     // ── Genesis ───────────────────────────────────────────────────────────
 
     #[pallet::genesis_config]
@@ -292,6 +313,11 @@ pub mod pallet {
         Donated {
             by: T::AccountId,
             amount: BalanceOf<T>,
+        },
+        /// A referral was recorded — boosts referrer's governance R-component.
+        Referred {
+            referrer: T::AccountId,
+            referral: T::AccountId,
         },
     }
 
@@ -596,6 +622,45 @@ pub mod pallet {
             T::CommitteeOrigin::ensure_origin(origin)?;
             ensure!(m <= MAX_MULTIPLIER, DispatchError::Other("exceeds max"));
             MatchMultiplier::<T>::put(m);
+            Ok(())
+        }
+
+        /// Record a referral. Referrer and referred must both be verified.
+        /// V0.1: simple count — V0.2 adds activity-gating & time-decay.
+        #[pallet::call_index(11)]
+        #[pallet::weight(10_000)]
+        pub fn record_referral(origin: OriginFor<T>, referrer: T::AccountId, referral_id: T::AccountId) -> DispatchResult {
+            let _who = ensure_signed(origin)?;
+            ensure!(T::Personhood::is_verified(&referrer), Error::<T>::NotVerified);
+            ensure!(T::Personhood::is_verified(&referral_id), Error::<T>::NotVerified);
+            ensure!(referrer != referral_id, Error::<T>::NotVerified); // no self-referral
+
+            let count = ReferralCount::<T>::get(&referrer);
+            ensure!(referral::can_refer(count), DispatchError::Other("referral full"));
+
+            let now = frame_system::Pallet::<T>::block_number();
+            let rec = referral::ReferralRecord::<T::AccountId, BlockNumberFor<T>> {
+                referrer: referrer.clone(),
+                referral: referral_id.clone(),
+                created_at: now,
+                activated: false,
+            };
+
+            Referrals::<T>::mutate(&referrer, |list| {
+                let _ = list.try_push(rec);
+            });
+            ReferralCount::<T>::insert(&referrer, count + 1);
+
+            // Update referrer's R-component
+            let (b, t, _r, d) = Components::<T>::get(&referrer);
+            Components::<T>::insert(&referrer, (b, t, count as u64 + 1, d));
+            Self::recalc(&referrer);
+
+            Self::deposit_event(Event::Referred {
+                referrer: referrer.clone(),
+                referral: referral_id,
+            });
+
             Ok(())
         }
     }

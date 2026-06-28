@@ -146,3 +146,11 @@ impl pallet_civ_governance::Config for Runtime {
     type WReferral = ConstU32<25>;
     type WDonation = ConstU32<25>;
 }
+
+impl pallet_civ_constitution::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    /// Max governance weight = 10,000 (intrinsic score units).
+    type MaxWeightCap = ConstU32<10_000>;
+    /// Max balance = 100× median.
+    type AccumulationRatio = ConstU32<100>;
+}

@@ -51,6 +51,7 @@ frame-system-benchmarking = { workspace = true, optional = true }
 pallet_civ_identity   = { workspace = true }
 pallet_civ_monetary   = { workspace = true }
 pallet_civ_governance = { workspace = true }
+pallet_civ_constitution = { workspace = true }
 
 [build-dependencies]
 substrate-wasm-builder = { workspace = true, optional = true }
@@ -92,6 +93,7 @@ std = [
     "pallet_civ_identity/std",
     "pallet_civ_monetary/std",
     "pallet_civ_governance/std",
+    "pallet_civ_constitution/std",
     "sp-keyring/std",
     "serde_json/std",
     "serde/std",

@@ -11,6 +11,7 @@ members = [
     "pallets/civ-identity",
     "pallets/civ-monetary",
     "pallets/civ-governance",
+    "pallets/civ-constitution",
     "runtime",
     "node",
 ]
@@ -24,9 +25,11 @@ civ-governance       = { path = "./pallets/civ-governance",default-features = fa
 pallet-civ-identity  = { path = "./pallets/civ-identity",  default-features = false }
 pallet-civ-monetary  = { path = "./pallets/civ-monetary",  default-features = false }
 pallet-civ-governance = { path = "./pallets/civ-governance",default-features = false }
+pallet-civ-constitution = { path = "./pallets/civ-constitution", default-features = false }
 pallet_civ_identity  = { path = "./pallets/civ-identity",  default-features = false, package = "pallet-civ-identity" }
 pallet_civ_monetary  = { path = "./pallets/civ-monetary",  default-features = false, package = "pallet-civ-monetary" }
 pallet_civ_governance = { path = "./pallets/civ-governance",default-features = false, package = "pallet-civ-governance" }
+pallet_civ_constitution = { path = "./pallets/civ-constitution", default-features = false, package = "pallet-civ-constitution" }
 clap                     = { version = "4.5.13" }
 frame-benchmarking-cli   = { version = "47.0.0",  default-features = false }
 frame-metadata-hash-extension = { version = "0.8.0",  default-features = false }
